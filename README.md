@@ -28,7 +28,7 @@ import (
 func parseFlags() (mode *string, port *uint, domain *string) {
     mode = flag.String("mode", "http", "Mode to run the server in (http or lambda)")
     port = flag.Uint("port", 8080, "Port to run the server on")
-    domain = flag.String("domain", "metrics.cloudzero.com", "Domain for the server")
+    domain = flag.String("domain", "example.com", "Domain for the server")
     flag.Parse()
     return
 }
