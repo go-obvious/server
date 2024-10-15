@@ -2,8 +2,6 @@ package config
 
 import (
 	"sync"
-
-	"github.com/sirupsen/logrus"
 )
 
 type Configurable interface {
@@ -21,10 +19,11 @@ func Register(cfgs ...Configurable) {
 	cfgs = append(cfgs, cfgs...)
 }
 
-func Load() {
+func Load() error {
 	for _, cfg := range cfgs {
 		if err := cfg.Load(); err != nil {
-			logrus.WithError(err).Fatal("error while loading configuration")
+			return err
 		}
 	}
+	return nil
 }
