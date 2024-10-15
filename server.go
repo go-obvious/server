@@ -36,6 +36,8 @@ type Server interface {
 	Shutdown()
 }
 
+type ServerVersion = about.ServerVersion
+
 type API interface {
 	Name() string
 	Register(app Server) error
@@ -43,7 +45,7 @@ type API interface {
 
 func New(
 	cfg *Config,
-	version *about.ServerVersion,
+	version *ServerVersion,
 	apis ...API,
 ) Server {
 	about.SetVersion(version)
