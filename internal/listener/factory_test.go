@@ -5,10 +5,11 @@ import (
 	"net/http"
 	"testing"
 
+	v1 "github.com/go-obvious/gateway"
+	v2 "github.com/go-obvious/gateway/v2"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/go-obvious/server/internal/listener"
-	"github.com/go-obvious/server/internal/listener/aws"
 )
 
 func TestGetListener(t *testing.T) {
@@ -16,7 +17,8 @@ func TestGetListener(t *testing.T) {
 		mode     string
 		expected listener.ListenAndServeFunc
 	}{
-		{mode: listener.AwsGatewayLambda, expected: aws.GatewayLambdaListenAndServe},
+		{mode: listener.AwsGatewayV2Lambda, expected: v2.ListenAndServe},
+		{mode: listener.AwsGatewayLambda, expected: v1.ListenAndServe},
 		{mode: listener.Http, expected: http.ListenAndServe}, // Added HTTP type check
 	}
 

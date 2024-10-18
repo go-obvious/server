@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/go-obvious/server/healthz"
-	"github.com/tj/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRun(t *testing.T) {

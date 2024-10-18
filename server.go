@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/cors"
 	"github.com/sirupsen/logrus"
 
@@ -52,7 +51,7 @@ func New(
 		serve:  listener.GetListener(cfg.Mode),
 	}
 
-	app.router.Use(middleware.Logger)
+	//app.router.Use(middleware.Logger)
 	app.router.Use(panic.Middleware)
 	cors := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},
@@ -101,7 +100,7 @@ func (a *server) Router() interface{} {
 }
 
 func (a *server) Run(ctx context.Context) {
-	logrus.Info("Running HTTP server")
+	logrus.Debug("Running HTTP server")
 	if err := a.serve(a.addr, a.router); err != nil {
 		logrus.WithError(err).Fatal("error while running HTTP server")
 	}
