@@ -3,12 +3,11 @@ package listener
 import (
 	"net/http"
 
-	v1 "github.com/go-obvious/gateway"
-	v2 "github.com/go-obvious/gateway/v2"
+	"github.com/go-obvious/gateway"
 )
 
 const (
-	AwsGatewayLambda   = "aws-gateway"
+	AwsGatewayLambda   = "aws-gateway-v1"
 	AwsGatewayV2Lambda = "aws-gateway-v2"
 	Https              = "https"
 	Http               = "http"
@@ -19,13 +18,9 @@ type ListenAndServeFunc func(addr string, router http.Handler) error
 func GetListener(mode string) ListenAndServeFunc {
 	switch mode {
 	case AwsGatewayLambda:
-		return v1.ListenAndServe
+		return gateway.ListenAndServeV1
 	case AwsGatewayV2Lambda:
-		return v2.ListenAndServe
-	// case Https:
-	// 	return func(addr string, router http.Handler) error {
-	// 		return http.ListenAndServeTLS(addr, "path/to/certfile", "path/to/keyfile", router)
-	// 	}
+		return gateway.ListenAndServeV2
 	default:
 		return http.ListenAndServe
 	}
