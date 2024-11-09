@@ -27,13 +27,15 @@ func InvokeService(api api.Service, route string, request http.Request) (*http.R
 	}
 
 	// Preserve the original query parameters
-	q := request.URL.Query()
-	for key, values := range q {
-		for _, value := range values {
-			q.Set(key, value)
+	if request.URL != nil {
+		q := request.URL.Query()
+		for key, values := range q {
+			for _, value := range values {
+				q.Set(key, value)
+			}
 		}
+		u.RawQuery = q.Encode()
 	}
-	u.RawQuery = q.Encode()
 	request.URL = u
 
 	// invoke the endpoint
