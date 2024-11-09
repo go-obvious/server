@@ -20,15 +20,21 @@ func InvokeService(api api.Service, route string, request http.Request) (*http.R
 	s := httptest.NewServer(api.Router)
 	defer s.Close()
 
-	//
 	// setup the target URL
 	u, err := url.Parse(s.URL + route)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing %s/%s: %v", s.URL, route, err)
 	}
+
+	// Preserve the original query parameters
+	q := request.URL.Query()
+	for key, values := range q {
+		for _, value := range values {
+			u.Query().Add(key, value)
+		}
+	}
 	request.URL = u
 
-	//
 	// invoke the endpoint
 	return s.Client().Do(&request)
 }
