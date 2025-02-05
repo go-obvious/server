@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/cors"
@@ -25,6 +26,9 @@ type Server interface {
 // Expose the Version struct
 type ServerVersion = about.ServerVersion
 
+// Middleware abstraction
+type Middleware func(next http.Handler) http.Handler
+
 type API interface {
 	Name() string
 	Register(app Server) error
@@ -32,6 +36,7 @@ type API interface {
 
 func New(
 	version *ServerVersion,
+	middleware []Middleware,
 	apis ...API,
 ) Server {
 	cfg := config.Server{}
@@ -75,6 +80,13 @@ func New(
 	app.router.Use(cors.Handler)
 	app.router.Use(apicaller.Middleware)
 	app.router.Use(requestid.Middleware)
+
+	// Add custom middleware layers
+	for _, m := range middleware {
+		if m != nil {
+			app.router.Use(m)
+		}
+	}
 
 	// Built in routes
 	app.router.Mount("/about", about.Endpoint())
