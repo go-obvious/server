@@ -206,7 +206,7 @@ func TestRunWithTLS(t *testing.T) {
 	os.Setenv("SERVER_CERTIFICATE_KEY_FILE", keyFile.Name())
 	os.Setenv("SERVER_MODE", "https")
 	os.Setenv("SERVER_DOMAIN", "localhost")
-	os.Setenv("SERVER_PORT", "443")
+	os.Setenv("SERVER_PORT", "8443")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -238,7 +238,7 @@ func TestRunWithTLS(t *testing.T) {
 		},
 	}
 
-	req, _ := http.NewRequest("GET", "https://localhost:443/about", nil)
+	req, _ := http.NewRequest("GET", "https://localhost:8443/about", nil)
 	resp, err := client.Do(req)
 	assert.NoError(t, err)
 	resp.Body.Close()
