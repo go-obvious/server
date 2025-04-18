@@ -241,6 +241,7 @@ func TestRunWithTLS(t *testing.T) {
 	req, _ := http.NewRequest("GET", "https://localhost:443/about", nil)
 	resp, err := client.Do(req)
 	assert.NoError(t, err)
+	resp.Body.Close()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
 
