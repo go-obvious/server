@@ -23,7 +23,7 @@ func TestGetListener(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.mode, func(t *testing.T) {
-			result := listener.GetListener(tt.mode)
+			result := listener.GetListener(tt.mode, nil)
 			assert.NotNil(t, result)
 			assert.Equal(t, funcType(tt.expected), funcType(result))
 		})

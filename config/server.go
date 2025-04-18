@@ -12,8 +12,9 @@ type Server struct {
 }
 
 type Certificate struct {
-	Cert string `envconfig:"SERVER_CERTIFICATE_CERT"`
-	Key  string `envconfig:"SERVER_CERTIFICATE_KEY"`
+	CertFile string `envconfig:"SERVER_CERTIFICATE_CERT_FILE"`
+	KeyFile  string `envconfig:"SERVER_CERTIFICATE_KEY_FILE"`
+	CAFile   string `envconfig:"SERVER_CERTIFICATE_CA_FILE"`
 }
 
 func (c *Server) Load() error {
