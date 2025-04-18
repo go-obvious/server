@@ -53,7 +53,7 @@ func New(
 	app := server{
 		addr:   fmt.Sprintf(":%d", cfg.Port),
 		router: chi.NewRouter(),
-		serve:  listener.GetListener(cfg.Mode),
+		serve:  listener.GetListener(cfg.Mode, cfg.Certificate),
 	}
 
 	//app.router.Use(middleware.Logger)
