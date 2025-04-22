@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 
@@ -31,12 +30,8 @@ func GetListener(mode string, certs *config.Certificate) ListenAndServeFunc {
 		return func(addr string, router http.Handler) error {
 			if certs != nil {
 				server := &http.Server{
-					Addr:         addr,
-					Handler:      router,
-					ReadTimeout:  -1,
-					WriteTimeout: -1,
-					IdleTimeout:  -1,
-					ErrorLog:     log.New(os.Stderr, "JB TLS Error: ", log.LstdFlags), // Log TLS errors
+					Addr:    addr,
+					Handler: router,
 				}
 				if certs.CAFile != "" {
 					certPool := x509.NewCertPool()

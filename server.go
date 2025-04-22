@@ -2,8 +2,12 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"log"
 	"net/http"
+	"os"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/cors"
@@ -20,6 +24,7 @@ import (
 
 type Server interface {
 	Router() interface{}
+	WithTLSProvider(tlsProvider func() *tls.Config) Server
 	Run(ctx context.Context)
 }
 
@@ -109,6 +114,20 @@ type server struct {
 
 func (a *server) Router() interface{} {
 	return a.router
+}
+
+func (a *server) WithTLSProvider(tlsProvider func() *tls.Config) Server {
+	a.serve = func(addr string, router http.Handler) error {
+			server := &http.Server{
+				Addr:     addr,
+				Handler:  router,
+				ErrorLog: log.New(os.Stderr, "JB 2 TLS Error: ", log.LstdFlags), // Log TLS errors
+				TLSConfig: tlsProvider(),
+			}
+			return server.ListenAndServeTLS("", "")
+		}
+		return http.ListenAndServe(addr, router)
+	}
 }
 
 func (a *server) Run(ctx context.Context) {
