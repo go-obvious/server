@@ -35,7 +35,7 @@ func TLSListener(tlsProvider func() *tls.Config) ListenAndServeFunc {
 		server := &http.Server{
 			Addr:      addr,
 			Handler:   router,
-			ErrorLog:  log.New(os.Stderr, "JB 2 TLS Error: ", log.LstdFlags),
+			ErrorLog:  log.New(os.Stderr, "JB 3 TLS Error: ", log.LstdFlags),
 			TLSConfig: tlsProvider(),
 		}
 		return server.ListenAndServeTLS("", "")

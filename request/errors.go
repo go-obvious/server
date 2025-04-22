@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	"github.com/go-chi/render"
-	"github.com/sirupsen/logrus"
 )
 
 type HTTPErrorCoder interface {
@@ -51,9 +50,9 @@ func (e *ResponseError) Error() string {
 	}
 }
 
-// AsFields returns the ResponseError as logrus.Fields for structured logging.
-func (e *ResponseError) AsFields() logrus.Fields {
-	fields := logrus.Fields{}
+// AsFields returns the ResponseError as zerolog.Fields for structured logging.
+func (e *ResponseError) AsFields() map[string]interface{} {
+	fields := map[string]interface{}{}
 
 	if e.CallerInfo != "" {
 		fields["caller_info"] = e.CallerInfo

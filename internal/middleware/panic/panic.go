@@ -6,7 +6,7 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 // This is another middleware that must stay on the top since
@@ -17,15 +17,15 @@ func Middleware(next http.Handler) http.Handler {
 			rvr := recover()
 			if rvr != nil && rvr != http.ErrAbortHandler {
 				stack := string(debug.Stack())
-				logrus.WithFields(logrus.Fields{
-					"panic":  fmt.Sprint(rvr),
-					"host":   r.Host,
-					"method": r.Method,
-					"uri":    r.RequestURI,
-					"url":    r.URL,
-					"remote": r.RemoteAddr,
-					"stack":  strings.Split(stack, "\n"),
-				}).Error("panicked!")
+				log.Error().
+					Str("panic", fmt.Sprint(rvr)).
+					Str("host", r.Host).
+					Str("method", r.Method).
+					Str("uri", r.RequestURI).
+					Interface("url", r.URL).
+					Str("remote", r.RemoteAddr).
+					Strs("stack", strings.Split(stack, "\n")).
+					Msg("panicked!")
 
 				w.WriteHeader(http.StatusInternalServerError)
 			}
