@@ -36,7 +36,7 @@ func TLSListener(readTimeout, writeTimeout, idleTimeout time.Duration, tlsProvid
 		server := &http.Server{
 			Addr:         addr,
 			Handler:      router,
-			ErrorLog:     log.New(os.Stderr, "go-obvious.server TLS Error: ", log.LstdFlags),
+			ErrorLog:     log.New(logAdapter{os.Stderr}, "go-obvious.server TLS Error: ", log.LstdFlags),
 			ReadTimeout:  readTimeout,
 			WriteTimeout: writeTimeout,
 			IdleTimeout:  idleTimeout,
