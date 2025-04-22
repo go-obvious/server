@@ -5,26 +5,43 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/go-chi/chi"
+	chi "github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 
 	"github.com/go-obvious/server/config"
-	"github.com/go-obvious/server/internal/about"
 	"github.com/go-obvious/server/internal/healthz"
 	"github.com/go-obvious/server/internal/middleware/apicaller"
 	"github.com/go-obvious/server/internal/middleware/panic"
 	"github.com/go-obvious/server/internal/middleware/requestid"
+	"github.com/go-obvious/server/internal/version"
 )
 
+// Server represents a configurable HTTP server interface.
+// It provides methods to set up the server's address, listener, middleware, APIs, and to run the server.
 type Server interface {
+	// Router returns the underlying router instance used by the server.
 	Router() interface{}
+
+	// WithAddress sets the server's address and returns the updated Server instance.
+	WithAddress(addr string) Server
+
+	// WithListener sets a custom listener function for the server and returns the updated Server instance.
 	WithListener(l ListenAndServeFunc) Server
+
+	// WithMiddleware adds middleware to the server and returns the updated Server instance.
+	// NOTE: Middlware must be added before APIs
+	WithMiddleware(m ...Middleware) Server
+
+	// WithAPIs registers APIs with the server and returns the updated Server instance.
+	WithAPIs(apis ...API) Server
+
+	// Run starts the server and blocks until the context is canceled.
 	Run(ctx context.Context)
 }
 
 // Expose the Version struct
-type ServerVersion = about.ServerVersion
+type ServerVersion = version.ServerVersion
 
 // Middleware abstraction
 type Middleware func(next http.Handler) http.Handler
@@ -35,20 +52,18 @@ type API interface {
 }
 
 func New(
-	version *ServerVersion,
-	middleware []Middleware,
-	apis ...API,
+	ver *ServerVersion,
 ) Server {
 	cfg := config.Server{}
 	config.Register(&cfg)
 
 	// This will load all configurations which have been registered
 	if err := config.Load(); err != nil {
-		logrus.WithError(err).Fatal("error while loading configuration")
+		log.Fatal().Err(err).Msg("error while loading configuration")
 	}
 
 	// Registers the callers version
-	about.SetVersion(version)
+	version.SetVersion(ver)
 
 	app := server{
 		addr:   fmt.Sprintf(":%d", cfg.Port),
@@ -81,23 +96,6 @@ func New(
 	app.router.Use(apicaller.Middleware)
 	app.router.Use(requestid.Middleware)
 
-	// Add custom middleware layers
-	for _, m := range middleware {
-		if m != nil {
-			app.router.Use(m)
-		}
-	}
-
-	// Built in routes
-	app.router.Mount("/about", about.Endpoint())
-	app.router.Mount("/healthz", healthz.Endpoint())
-
-	for _, api := range apis {
-		if err := api.Register(&app); err != nil {
-			logrus.Fatal(err)
-		}
-	}
-
 	return &app
 }
 
@@ -105,6 +103,33 @@ type server struct {
 	addr   string
 	router *chi.Mux
 	serve  ListenAndServeFunc
+}
+
+func (a *server) WithAPIs(apis ...API) Server {
+	for _, api := range apis {
+		if err := api.Register(a); err != nil {
+			log.Fatal().Err(err).Msg("error while registering API")
+		}
+	}
+	// Finally add Built in routes
+	a.router.Mount("/version", version.Endpoint())
+	a.router.Mount("/healthz", healthz.Endpoint())
+	return a
+}
+
+func (a *server) WithMiddleware(middlewares ...Middleware) Server {
+	// Add custom middleware layers
+	for _, m := range middlewares {
+		if m != nil {
+			a.router.Use(m)
+		}
+	}
+	return a
+}
+
+func (a *server) WithAddress(addr string) Server {
+	a.addr = addr
+	return a
 }
 
 func (a *server) Router() interface{} {
@@ -117,8 +142,8 @@ func (a *server) WithListener(l ListenAndServeFunc) Server {
 }
 
 func (a *server) Run(ctx context.Context) {
-	logrus.Debug("Running HTTP server")
+	log.Debug().Msg("Running HTTP server")
 	if err := a.serve(a.addr, a.router); err != nil {
-		logrus.WithError(err).Fatal("error while running HTTP server")
+		log.Fatal().Err(err).Msg("error while running HTTP server")
 	}
 }

@@ -1,20 +1,25 @@
 package panic_test
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/sirupsen/logrus"
-	"github.com/sirupsen/logrus/hooks/test"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 
 	middleware "github.com/go-obvious/server/internal/middleware/panic"
 )
 
 func TestMiddleware(t *testing.T) {
-	logger, hook := test.NewNullLogger()
-	logrus.SetOutput(logger.Writer())
+	// Set up zerolog to log to a writer for testing
+	var logBuffer bytes.Buffer
+	writer := zerolog.ConsoleWriter{
+		Out: &logBuffer,
+	}
+	log.Logger = zerolog.New(writer).With().Timestamp().Logger()
 
 	tests := []struct {
 		name           string
@@ -47,19 +52,17 @@ func TestMiddleware(t *testing.T) {
 
 			rr := httptest.NewRecorder()
 			handler := middleware.Middleware(http.HandlerFunc(tt.handler))
-
+			// Logs are captured in the logs slice
 			handler.ServeHTTP(rr, req)
 
 			assert.Equal(t, tt.expectedStatus, rr.Code)
-
+			logOutput := logBuffer.String()
 			if tt.expectPanicLog {
-				assert.NotEmpty(t, hook.Entries)
-				assert.Contains(t, hook.LastEntry().Message, "panicked!")
+				// Check if the log contains the expected panic message
+				assert.Contains(t, logOutput, "panicked!")
 			} else {
-				assert.Empty(t, hook.Entries)
+				assert.NotContains(t, logOutput, "panicked!")
 			}
-
-			hook.Reset()
 		})
 	}
 }

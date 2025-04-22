@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 
-	"github.com/go-chi/chi"
+	chi "github.com/go-chi/chi/v5"
 	"github.com/go-obvious/server/api"
 )
 

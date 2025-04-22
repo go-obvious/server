@@ -1,4 +1,4 @@
-package about_test
+package version_test
 
 import (
 	"net/http"
@@ -8,17 +8,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/go-obvious/server/internal/about"
+	"github.com/go-obvious/server/internal/version"
 )
 
 func TestEndpoint(t *testing.T) {
-	about.SetVersion(&about.ServerVersion{
+	version.SetVersion(&version.ServerVersion{
 		Revision: "test",
 		Tag:      "test",
 		Time:     "test",
 	})
 
-	handler := about.Endpoint()
+	handler := version.Endpoint()
 	req, err := http.NewRequest("GET", "/", nil)
 	require.NoError(t, err)
 

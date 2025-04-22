@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/go-chi/chi"
-	"github.com/sirupsen/logrus"
+	chi "github.com/go-chi/chi/v5"
+	"github.com/rs/zerolog/log"
 
 	"github.com/go-obvious/server/request"
 )
@@ -40,7 +40,7 @@ func (a *Service) Register(app Server) error {
 
 // Common Placeholder...
 func OnNotImplemented(w http.ResponseWriter, r *http.Request) {
-	logrus.WithField("method", "api.OnNotImplemented").Trace("http.call")
+	log.Trace().Str("method", "api.OnNotImplemented").Msg("http.call")
 
 	status := http.StatusOK
 	result := request.Result{Success: true}

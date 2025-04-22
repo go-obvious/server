@@ -15,7 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi"
+	chi "github.com/go-chi/chi/v5"
+
 	"github.com/go-obvious/server"
 	"github.com/go-obvious/server/internal/middleware/apicaller"
 	"github.com/go-obvious/server/internal/middleware/panic"
@@ -54,7 +55,7 @@ func TestNew(t *testing.T) {
 		&mockAPI{name: "mockAPI"},
 	}
 
-	srv := server.New(version, middleware, apis...)
+	srv := server.New(version).WithMiddleware(middleware...).WithAPIs(apis...)
 
 	assert.NotNil(t, srv)
 	assert.IsType(t, &server.ServerVersion{}, version)
@@ -63,7 +64,7 @@ func TestNew(t *testing.T) {
 	assert.NotNil(t, router)
 
 	// Test built-in routes
-	req, _ := http.NewRequest("GET", "/about", nil)
+	req, _ := http.NewRequest("GET", "/version", nil)
 	rr := httptest.NewRecorder()
 	router.ServeHTTP(rr, req)
 	assert.Equal(t, http.StatusOK, rr.Code)
@@ -95,7 +96,7 @@ func TestRun(t *testing.T) {
 		&mockAPI{name: "mockAPI"},
 	}
 
-	srv := server.New(version, middleware, apis...)
+	srv := server.New(version).WithMiddleware(middleware...).WithAPIs(apis...)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -105,7 +106,7 @@ func TestRun(t *testing.T) {
 	}()
 
 	// Test if the server is running by making a request to a known route
-	req, _ := http.NewRequest("GET", "/about", nil)
+	req, _ := http.NewRequest("GET", "/version", nil)
 	rr := httptest.NewRecorder()
 	srv.Router().(*chi.Mux).ServeHTTP(rr, req)
 	assert.Equal(t, http.StatusOK, rr.Code)
@@ -122,7 +123,7 @@ func TestNewWithNilMiddleware(t *testing.T) {
 		&mockAPI{name: "mockAPI"},
 	}
 
-	srv := server.New(version, middleware, apis...)
+	srv := server.New(version).WithMiddleware(middleware...).WithAPIs(apis...)
 
 	assert.NotNil(t, srv)
 	assert.IsType(t, &server.ServerVersion{}, version)
@@ -131,7 +132,7 @@ func TestNewWithNilMiddleware(t *testing.T) {
 	assert.NotNil(t, router)
 
 	// Test built-in routes
-	req, _ := http.NewRequest("GET", "/about", nil)
+	req, _ := http.NewRequest("GET", "/version", nil)
 	rr := httptest.NewRecorder()
 	router.ServeHTTP(rr, req)
 	assert.Equal(t, http.StatusOK, rr.Code)
@@ -161,7 +162,7 @@ func TestNewWithNilAPI(t *testing.T) {
 
 	var apis []server.API
 
-	srv := server.New(version, middleware, apis...)
+	srv := server.New(version).WithMiddleware(middleware...).WithAPIs(apis...)
 
 	assert.NotNil(t, srv)
 	assert.IsType(t, &server.ServerVersion{}, version)
@@ -170,7 +171,7 @@ func TestNewWithNilAPI(t *testing.T) {
 	assert.NotNil(t, router)
 
 	// Test built-in routes
-	req, _ := http.NewRequest("GET", "/about", nil)
+	req, _ := http.NewRequest("GET", "/version", nil)
 	rr := httptest.NewRecorder()
 	router.ServeHTTP(rr, req)
 	assert.Equal(t, http.StatusOK, rr.Code)
@@ -202,11 +203,7 @@ func TestRunWithTLS(t *testing.T) {
 	keyFile.Close()
 
 	// this ensures the server start reads these files
-	os.Setenv("SERVER_CERTIFICATE_CERT_FILE", certFile.Name())
-	os.Setenv("SERVER_CERTIFICATE_KEY_FILE", keyFile.Name())
 	os.Setenv("SERVER_MODE", "https")
-	os.Setenv("SERVER_DOMAIN", "localhost")
-	os.Setenv("SERVER_PORT", "8443")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -225,7 +222,8 @@ func TestRunWithTLS(t *testing.T) {
 		&mockAPI{name: "mockAPI"},
 	}
 
-	srv := server.New(version, middleware, apis...)
+	srv := server.New(version).WithMiddleware(middleware...).WithAPIs(apis...).WithAddress("localhost:8443")
+
 	go srv.WithListener(server.TLSListener(func() *tls.Config {
 		tlsCert, err := tls.X509KeyPair(cert, key)
 		assert.NoError(t, err)
@@ -245,7 +243,7 @@ func TestRunWithTLS(t *testing.T) {
 		},
 	}
 
-	req, _ := http.NewRequest("GET", "https://localhost:8443/about", nil)
+	req, _ := http.NewRequest("GET", "https://localhost:8443/version", nil)
 	resp, err := client.Do(req)
 	assert.NoError(t, err)
 	resp.Body.Close()
