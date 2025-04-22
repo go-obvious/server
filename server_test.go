@@ -226,7 +226,14 @@ func TestRunWithTLS(t *testing.T) {
 	}
 
 	srv := server.New(version, middleware, apis...)
-	go srv.Run(ctx)
+	go srv.WithListener(server.TLSListener(func() *tls.Config {
+		tlsCert, err := tls.X509KeyPair(cert, key)
+		assert.NoError(t, err)
+
+		return &tls.Config{
+			Certificates: []tls.Certificate{tlsCert},
+		}
+	})).Run(ctx)
 
 	// Sleep to allow svr.Run to initialize anything it needs.
 	time.Sleep(100 * time.Millisecond)

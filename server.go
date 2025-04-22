@@ -12,7 +12,6 @@ import (
 	"github.com/go-obvious/server/config"
 	"github.com/go-obvious/server/internal/about"
 	"github.com/go-obvious/server/internal/healthz"
-	"github.com/go-obvious/server/internal/listener"
 	"github.com/go-obvious/server/internal/middleware/apicaller"
 	"github.com/go-obvious/server/internal/middleware/panic"
 	"github.com/go-obvious/server/internal/middleware/requestid"
@@ -20,6 +19,7 @@ import (
 
 type Server interface {
 	Router() interface{}
+	WithListener(l ListenAndServeFunc) Server
 	Run(ctx context.Context)
 }
 
@@ -53,7 +53,7 @@ func New(
 	app := server{
 		addr:   fmt.Sprintf(":%d", cfg.Port),
 		router: chi.NewRouter(),
-		serve:  listener.GetListener(cfg.Mode, cfg.Certificate),
+		serve:  HTTPListener(),
 	}
 
 	//app.router.Use(middleware.Logger)
@@ -104,11 +104,16 @@ func New(
 type server struct {
 	addr   string
 	router *chi.Mux
-	serve  listener.ListenAndServeFunc
+	serve  ListenAndServeFunc
 }
 
 func (a *server) Router() interface{} {
 	return a.router
+}
+
+func (a *server) WithListener(l ListenAndServeFunc) Server {
+	a.serve = l
+	return a
 }
 
 func (a *server) Run(ctx context.Context) {
