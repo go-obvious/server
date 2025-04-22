@@ -224,7 +224,7 @@ func TestRunWithTLS(t *testing.T) {
 
 	srv := server.New(version).WithMiddleware(middleware...).WithAPIs(apis...).WithAddress("localhost:8443")
 
-	go srv.WithListener(server.TLSListener(func() *tls.Config {
+	go srv.WithListener(server.TLSListener(-1, -1, -1, func() *tls.Config {
 		tlsCert, err := tls.X509KeyPair(cert, key)
 		assert.NoError(t, err)
 

@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/go-obvious/gateway"
 )
@@ -30,13 +31,16 @@ func HTTPListener() ListenAndServeFunc {
 	return http.ListenAndServe
 }
 
-func TLSListener(tlsProvider func() *tls.Config) ListenAndServeFunc {
+func TLSListener(readTimeout, writeTimeout, idleTimeout time.Duration, tlsProvider func() *tls.Config) ListenAndServeFunc {
 	return func(addr string, router http.Handler) error {
 		server := &http.Server{
-			Addr:      addr,
-			Handler:   router,
-			ErrorLog:  log.New(os.Stderr, "JB 3 TLS Error: ", log.LstdFlags),
-			TLSConfig: tlsProvider(),
+			Addr:         addr,
+			Handler:      router,
+			ErrorLog:     log.New(os.Stderr, "go-obvious.server TLS Error: ", log.LstdFlags),
+			ReadTimeout:  readTimeout,
+			WriteTimeout: writeTimeout,
+			IdleTimeout:  idleTimeout,
+			TLSConfig:    tlsProvider(),
 		}
 		return server.ListenAndServeTLS("", "")
 	}
