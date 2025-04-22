@@ -2,11 +2,8 @@ package server
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
-	"log"
 	"net/http"
-	"os"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/cors"
@@ -15,7 +12,6 @@ import (
 	"github.com/go-obvious/server/config"
 	"github.com/go-obvious/server/internal/about"
 	"github.com/go-obvious/server/internal/healthz"
-	"github.com/go-obvious/server/internal/listener"
 	"github.com/go-obvious/server/internal/middleware/apicaller"
 	"github.com/go-obvious/server/internal/middleware/panic"
 	"github.com/go-obvious/server/internal/middleware/requestid"
@@ -23,7 +19,7 @@ import (
 
 type Server interface {
 	Router() interface{}
-	WithTLSProvider(tlsProvider func() *tls.Config) Server
+	WithListener(l ListenAndServeFunc) Server
 	Run(ctx context.Context)
 }
 
@@ -57,7 +53,7 @@ func New(
 	app := server{
 		addr:   fmt.Sprintf(":%d", cfg.Port),
 		router: chi.NewRouter(),
-		serve:  listener.GetListener(cfg.Mode, cfg.Certificate),
+		serve:  HTTPListener(),
 	}
 
 	//app.router.Use(middleware.Logger)
@@ -108,23 +104,15 @@ func New(
 type server struct {
 	addr   string
 	router *chi.Mux
-	serve  listener.ListenAndServeFunc
+	serve  ListenAndServeFunc
 }
 
 func (a *server) Router() interface{} {
 	return a.router
 }
 
-func (a *server) WithTLSProvider(tlsProvider func() *tls.Config) Server {
-	a.serve = func(addr string, router http.Handler) error {
-		server := &http.Server{
-			Addr:      addr,
-			Handler:   router,
-			ErrorLog:  log.New(os.Stderr, "JB 2 TLS Error: ", log.LstdFlags), // Log TLS errors
-			TLSConfig: tlsProvider(),
-		}
-		return server.ListenAndServeTLS("", "")
-	}
+func (a *server) WithListener(l ListenAndServeFunc) Server {
+	a.serve = l
 	return a
 }
 
