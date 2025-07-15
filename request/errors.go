@@ -7,6 +7,8 @@ import (
 	"net/http"
 
 	"github.com/go-chi/render"
+
+	"github.com/go-obvious/server/internal/middleware/requestid"
 )
 
 type HTTPErrorCoder interface {
@@ -20,9 +22,12 @@ type ResponseError struct {
 	Err            error  `json:"-"` // low-level runtime error
 	HTTPStatusCode int    `json:"-"` // http response status code
 
-	StatusText string `json:"status"`          // user-level status message
-	AppCode    *int64 `json:"code,omitempty"`  // application-specific error code
-	ErrorText  string `json:"error,omitempty"` // application-level error message, for debugging
+	StatusText    string `json:"status"`                // user-level status message
+	AppCode       *int64 `json:"code,omitempty"`        // application-specific error code
+	ErrorText     string `json:"error,omitempty"`       // application-level error message, for debugging
+	CorrelationID string `json:"correlation_id,omitempty"` // correlation ID for tracing
+	RequestID     string `json:"request_id,omitempty"`  // request ID for debugging
+	TraceID       string `json:"trace_id,omitempty"`    // trace ID for distributed tracing
 }
 
 // NewHTTPError creates a new ResponseError with the given error and HTTP status code.
@@ -72,13 +77,34 @@ func (e *ResponseError) AsFields() map[string]interface{} {
 	if e.ErrorText != "" {
 		fields["error_text"] = e.ErrorText
 	}
+	if e.CorrelationID != "" {
+		fields["correlation_id"] = e.CorrelationID
+	}
+	if e.RequestID != "" {
+		fields["request_id"] = e.RequestID
+	}
+	if e.TraceID != "" {
+		fields["trace_id"] = e.TraceID
+	}
 
 	return fields
 }
 
-// Render sets the HTTP status code for the response.
+// Render sets the HTTP status code for the response and includes correlation headers.
 func (e *ResponseError) Render(w http.ResponseWriter, r *http.Request) error {
 	render.Status(r, e.HTTPStatusCode)
+	
+	// Set correlation headers for tracing
+	if e.CorrelationID != "" {
+		w.Header().Set(requestid.CorrelationIDHeader, e.CorrelationID)
+	}
+	if e.RequestID != "" {
+		w.Header().Set(requestid.RequestIDHeader, e.RequestID)
+	}
+	if e.TraceID != "" {
+		w.Header().Set(requestid.TraceIDHeader, e.TraceID)
+	}
+	
 	return nil
 }
 
@@ -139,4 +165,62 @@ func HasCode(err error, code int) bool {
 		return re.HTTPStatusCode == code
 	}
 	return false
+}
+
+// WithCorrelationContext enriches a ResponseError with correlation context from the request.
+func WithCorrelationContext(r *http.Request, responseErr *ResponseError) *ResponseError {
+	if reqCtx := requestid.GetContext(r.Context()); reqCtx != nil {
+		responseErr.CorrelationID = reqCtx.CorrelationID
+		responseErr.RequestID = reqCtx.RequestID
+		responseErr.TraceID = reqCtx.TraceID
+	}
+	return responseErr
+}
+
+// NewContextAwareError creates a new ResponseError with correlation context from the request.
+func NewContextAwareError(r *http.Request, err error, code int, statusText string) *ResponseError {
+	responseErr := &ResponseError{
+		Err:            err,
+		HTTPStatusCode: code,
+		StatusText:     statusText,
+		ErrorText:      err.Error(),
+	}
+	return WithCorrelationContext(r, responseErr)
+}
+
+// ErrInvalidRequestWithContext creates a context-aware ResponseError for invalid requests.
+func ErrInvalidRequestWithContext(r *http.Request, err error) render.Renderer {
+	return NewContextAwareError(r, err, http.StatusBadRequest, "invalid request")
+}
+
+// ErrRenderWithContext creates a context-aware ResponseError for rendering errors.
+func ErrRenderWithContext(r *http.Request, err error) render.Renderer {
+	return NewContextAwareError(r, err, http.StatusInternalServerError, "unable to process response")
+}
+
+// NewErrNotFoundWithContext creates a context-aware ResponseError for resource not found errors.
+func NewErrNotFoundWithContext(r *http.Request) *ResponseError {
+	responseErr := &ResponseError{
+		HTTPStatusCode: http.StatusNotFound,
+		StatusText:     "resource not found",
+	}
+	return WithCorrelationContext(r, responseErr)
+}
+
+// NewErrServerWithContext creates a context-aware ResponseError for internal server errors.
+func NewErrServerWithContext(r *http.Request) *ResponseError {
+	responseErr := &ResponseError{
+		HTTPStatusCode: http.StatusInternalServerError,
+		StatusText:     "error processing request",
+	}
+	return WithCorrelationContext(r, responseErr)
+}
+
+// WrapRenderWithContext wraps the render.Render function with context-aware error handling.
+func WrapRenderWithContext(w http.ResponseWriter, r *http.Request, v render.Renderer) {
+	if err := render.Render(w, r, v); err != nil {
+		if rerr := render.Render(w, r, ErrRenderWithContext(r, err)); rerr != nil {
+			panic(rerr)
+		}
+	}
 }

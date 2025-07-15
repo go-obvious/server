@@ -61,6 +61,121 @@ The server can be configured using environment variables:
 - Certificate validation at startup
 - Configurable rate limiting with multiple algorithms and key extractors
 
+## 🔧 Configuration Registry
+
+The server provides an elegant configuration registry pattern that allows external services and libraries to register their own configurations. This enables a unified, fail-fast configuration system where all components validate their settings at startup.
+
+### How It Works
+
+The configuration registry uses a simple `Configurable` interface:
+
+```go
+type Configurable interface {
+    Load() error
+}
+```
+
+**The Pattern:**
+1. **Self-Registration** - Components register themselves during initialization
+2. **Centralized Loading** - Server calls `config.Load()` to process all configurations
+3. **Fail-Fast Validation** - Invalid configuration prevents startup with clear error messages
+4. **Environment-Driven** - Uses standard environment variables with sensible defaults
+
+### Integrating Your Service Configuration
+
+```go
+package myservice
+
+import (
+    "github.com/kelseyhightower/envconfig"
+    "github.com/go-obvious/server/config"
+)
+
+// Define your configuration struct
+type Config struct {
+    DatabaseURL    string `envconfig:"MY_SERVICE_DATABASE_URL" default:"localhost:5432"`
+    APIKey         string `envconfig:"MY_SERVICE_API_KEY" required:"true"`
+    MaxConnections int    `envconfig:"MY_SERVICE_MAX_CONNECTIONS" default:"10"`
+    Debug          bool   `envconfig:"MY_SERVICE_DEBUG" default:"false"`
+}
+
+// Implement the Configurable interface
+func (c *Config) Load() error {
+    // Load environment variables
+    if err := envconfig.Process("my_service", c); err != nil {
+        return fmt.Errorf("failed to load MyService config: %w", err)
+    }
+    
+    // Add custom validation
+    if c.MaxConnections < 1 || c.MaxConnections > 100 {
+        return fmt.Errorf("MY_SERVICE_MAX_CONNECTIONS must be between 1 and 100, got %d", c.MaxConnections)
+    }
+    
+    return nil
+}
+
+// Service with self-registering configuration
+type Service struct {
+    config *Config
+}
+
+func NewService() *Service {
+    cfg := &Config{}
+    
+    // Self-register with the configuration system
+    config.Register(cfg)
+    
+    return &Service{config: cfg}
+}
+
+// Access validated configuration after server.Run()
+func (s *Service) Connect() error {
+    // config is guaranteed to be loaded and validated
+    return connectToDatabase(s.config.DatabaseURL)
+}
+```
+
+### Usage in Your Application
+
+```go
+func main() {
+    // Components self-register their configurations
+    myService := myservice.NewService()
+    anotherService := another.NewService()
+    
+    // Server automatically loads and validates ALL registered configurations
+    version := &server.ServerVersion{Revision: "v1.0.0"}
+    srv := server.New(version).WithAPIs(myService, anotherService)
+    
+    // config.Load() is called automatically - fails fast if any config is invalid
+    srv.Run(context.Background())
+    
+    // All configurations are guaranteed valid at this point
+}
+```
+
+### Environment Variables
+
+Set your service environment variables:
+
+```bash
+export MY_SERVICE_DATABASE_URL=postgres://user:pass@localhost:5432/mydb
+export MY_SERVICE_API_KEY=your-secret-key
+export MY_SERVICE_MAX_CONNECTIONS=20
+export MY_SERVICE_DEBUG=true
+```
+
+### Benefits of This Pattern
+
+**🎯 Centralized** - All configuration loading happens in one place  
+**🚀 Fail-Fast** - Invalid configuration prevents startup with clear error messages  
+**🔧 Self-Contained** - Each service manages its own configuration and validation  
+**🌍 Environment-Driven** - Follows 12-factor app principles  
+**🔒 Type-Safe** - Strongly-typed configuration with compile-time checks  
+**🔄 Extensible** - Easy to add new configurable components
+
+The configuration registry eliminates configuration chaos by providing a standard pattern that scales from simple services to complex microservice architectures.
+
 ## 🚀 Quick Start
 
 ### Basic HTTP Server
