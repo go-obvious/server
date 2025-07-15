@@ -2,6 +2,7 @@
 .tmp.env*
 *.swp
 *.swo
+*.out
 
 /dist
 CLAUDE.md
@@ -49,3 +50,4 @@ __debug_bin*
 # drawio temp files
 *.drawio.bkp
 *.drawio.dtmp
+coverage.html
