@@ -18,13 +18,13 @@ import (
 // the complete middleware chain and is preserved in error responses
 func TestErrorContextPreservation(t *testing.T) {
 	tests := []struct {
-		name                  string
-		correlationIDHeader   string
-		traceIDHeader        string
-		handlerBehavior      string
-		expectedStatus       int
-		expectCorrelationID  bool
-		expectPanicRecovery  bool
+		name                string
+		correlationIDHeader string
+		traceIDHeader       string
+		handlerBehavior     string
+		expectedStatus      int
+		expectCorrelationID bool
+		expectPanicRecovery bool
 	}{
 		{
 			name:                "Normal request with correlation context",
@@ -75,7 +75,7 @@ func TestErrorContextPreservation(t *testing.T) {
 					})
 				case "error":
 					// Simulate application error with correlation context
-					err := request.ErrInvalidRequestWithContext(r, 
+					err := request.ErrInvalidRequestWithContext(r,
 						&testError{message: "invalid input"})
 					request.WrapRenderWithContext(w, r, err)
 				case "panic":
@@ -110,7 +110,7 @@ func TestErrorContextPreservation(t *testing.T) {
 			if tt.expectCorrelationID {
 				correlationID := rr.Header().Get("X-Correlation-ID")
 				assert.NotEmpty(t, correlationID)
-				
+
 				if tt.correlationIDHeader != "" {
 					assert.Equal(t, tt.correlationIDHeader, correlationID)
 				}
@@ -126,7 +126,7 @@ func TestErrorContextPreservation(t *testing.T) {
 			// Verify JSON error response structure
 			if tt.expectedStatus != http.StatusOK {
 				assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
-				
+
 				var errorResp map[string]interface{}
 				err := json.Unmarshal(rr.Body.Bytes(), &errorResp)
 				require.NoError(t, err)
@@ -143,7 +143,7 @@ func TestErrorContextPreservation(t *testing.T) {
 
 				// Verify error message structure
 				assert.NotEmpty(t, errorResp["error"])
-				
+
 				if tt.expectPanicRecovery {
 					assert.Equal(t, "Internal server error", errorResp["error"])
 				}
@@ -185,7 +185,7 @@ func TestMiddlewareOrder(t *testing.T) {
 			// Both orders should result in proper error handling
 			assert.Equal(t, http.StatusInternalServerError, rr.Code)
 			assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
-			
+
 			// Should have correlation ID in response headers
 			assert.NotEmpty(t, rr.Header().Get("X-Correlation-ID"))
 		})

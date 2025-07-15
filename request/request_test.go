@@ -35,10 +35,10 @@ func TestParam(t *testing.T) {
 
 func TestQS(t *testing.T) {
 	tests := []struct {
-		name           string
-		url            string
-		paramName      string
-		expectedValue  string
+		name          string
+		url           string
+		paramName     string
+		expectedValue string
 	}{
 		{
 			name:          "Valid query parameter",
@@ -135,11 +135,11 @@ func TestQSAll(t *testing.T) {
 
 func TestQSDefault(t *testing.T) {
 	tests := []struct {
-		name           string
-		url            string
-		paramName      string
-		defaultValue   string
-		expectedValue  string
+		name          string
+		url           string
+		paramName     string
+		defaultValue  string
+		expectedValue string
 	}{
 		{
 			name:          "Parameter exists",
@@ -270,7 +270,7 @@ func TestGetBody_MaxBodySize(t *testing.T) {
 		// Create a body around the limit
 		largeValue := strings.Repeat("a", request.MaxBodySize/2)
 		largeBody := `{"large_field":"` + largeValue + `"}`
-		
+
 		req, err := http.NewRequest("POST", "/test", strings.NewReader(largeBody))
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/json")

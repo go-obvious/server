@@ -14,11 +14,11 @@ import (
 
 func TestMiddleware_CorrelationID(t *testing.T) {
 	tests := []struct {
-		name                    string
-		correlationIDHeader     string
-		traceIDHeader          string
-		requestIDHeader        string
-		expectedCorrelationID  string
+		name                        string
+		correlationIDHeader         string
+		traceIDHeader               string
+		requestIDHeader             string
+		expectedCorrelationID       string
 		shouldGenerateCorrelationID bool
 	}{
 		{

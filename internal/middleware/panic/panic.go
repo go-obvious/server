@@ -32,7 +32,7 @@ func Middleware(next http.Handler) http.Handler {
 				correlationID := ""
 				requestIDValue := ""
 				traceID := ""
-				
+
 				if reqCtx != nil {
 					correlationID = reqCtx.CorrelationID
 					requestIDValue = reqCtx.RequestID

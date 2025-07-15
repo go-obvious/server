@@ -180,10 +180,12 @@ func TestContextAwareErrorHelpers(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			errorResult := tt.createError()
-			
+
 			// Extract ResponseError
 			var responseErr *request.ResponseError
-			if _, ok := errorResult.(interface{ Render(http.ResponseWriter, *http.Request) error }); ok {
+			if _, ok := errorResult.(interface {
+				Render(http.ResponseWriter, *http.Request) error
+			}); ok {
 				// For render.Renderer types, we need to extract the underlying ResponseError
 				if re, ok := errorResult.(*request.ResponseError); ok {
 					responseErr = re
@@ -217,7 +219,7 @@ func TestWrapRenderWithContext(t *testing.T) {
 	t.Run("Successful render", func(t *testing.T) {
 		rr := httptest.NewRecorder()
 		successRenderer := &mockRenderer{shouldFail: false}
-		
+
 		// Should not panic
 		assert.NotPanics(t, func() {
 			request.WrapRenderWithContext(rr, req, successRenderer)
@@ -228,7 +230,7 @@ func TestWrapRenderWithContext(t *testing.T) {
 	t.Run("Failed render with error handler", func(t *testing.T) {
 		rr := httptest.NewRecorder()
 		failRenderer := &mockRenderer{shouldFail: true}
-		
+
 		// Should not panic (error should be handled)
 		assert.NotPanics(t, func() {
 			request.WrapRenderWithContext(rr, req, failRenderer)

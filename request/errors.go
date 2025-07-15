@@ -22,12 +22,12 @@ type ResponseError struct {
 	Err            error  `json:"-"` // low-level runtime error
 	HTTPStatusCode int    `json:"-"` // http response status code
 
-	StatusText    string `json:"status"`                // user-level status message
-	AppCode       *int64 `json:"code,omitempty"`        // application-specific error code
-	ErrorText     string `json:"error,omitempty"`       // application-level error message, for debugging
+	StatusText    string `json:"status"`                   // user-level status message
+	AppCode       *int64 `json:"code,omitempty"`           // application-specific error code
+	ErrorText     string `json:"error,omitempty"`          // application-level error message, for debugging
 	CorrelationID string `json:"correlation_id,omitempty"` // correlation ID for tracing
-	RequestID     string `json:"request_id,omitempty"`  // request ID for debugging
-	TraceID       string `json:"trace_id,omitempty"`    // trace ID for distributed tracing
+	RequestID     string `json:"request_id,omitempty"`     // request ID for debugging
+	TraceID       string `json:"trace_id,omitempty"`       // trace ID for distributed tracing
 }
 
 // NewHTTPError creates a new ResponseError with the given error and HTTP status code.
@@ -93,7 +93,7 @@ func (e *ResponseError) AsFields() map[string]interface{} {
 // Render sets the HTTP status code for the response and includes correlation headers.
 func (e *ResponseError) Render(w http.ResponseWriter, r *http.Request) error {
 	render.Status(r, e.HTTPStatusCode)
-	
+
 	// Set correlation headers for tracing
 	if e.CorrelationID != "" {
 		w.Header().Set(requestid.CorrelationIDHeader, e.CorrelationID)
@@ -104,7 +104,7 @@ func (e *ResponseError) Render(w http.ResponseWriter, r *http.Request) error {
 	if e.TraceID != "" {
 		w.Header().Set(requestid.TraceIDHeader, e.TraceID)
 	}
-	
+
 	return nil
 }
 

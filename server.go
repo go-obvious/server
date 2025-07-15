@@ -141,12 +141,12 @@ func New(
 }
 
 type server struct {
-	addr         string
-	router       *chi.Mux
-	serve        ListenAndServeFunc
-	apis         []API
+	addr            string
+	router          *chi.Mux
+	serve           ListenAndServeFunc
+	apis            []API
 	shutdownTimeout time.Duration
-	isHTTPListener bool // Track if using basic HTTP listener
+	isHTTPListener  bool // Track if using basic HTTP listener
 }
 
 func (a *server) WithAPIs(apis ...API) Server {
@@ -200,7 +200,7 @@ func (a *server) Run(ctx context.Context) {
 
 	// Create HTTP server for graceful shutdown support
 	srv := a.createHTTPServer()
-	
+
 	// Start server in a goroutine
 	serverErr := make(chan error, 1)
 	go func() {
@@ -223,11 +223,11 @@ func (a *server) Run(ctx context.Context) {
 // createShutdownContext creates a context that cancels on OS signals or parent context cancellation
 func (a *server) createShutdownContext(parentCtx context.Context) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(parentCtx)
-	
+
 	// Listen for OS signals
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	
+
 	go func() {
 		select {
 		case sig := <-sigChan:
@@ -237,7 +237,7 @@ func (a *server) createShutdownContext(parentCtx context.Context) (context.Conte
 			// Parent context was cancelled
 		}
 	}()
-	
+
 	return ctx, cancel
 }
 
@@ -268,7 +268,7 @@ func (a *server) serveWithServer(srv *http.Server) error {
 	if a.isHTTPListener {
 		return srv.ListenAndServe()
 	}
-	
+
 	// For custom listeners, we fall back to the original serve function
 	// Note: This won't support graceful shutdown for custom listeners
 	return a.serve(a.addr, a.router)
@@ -292,7 +292,7 @@ func (a *server) gracefulShutdown(srv *http.Server) {
 
 	// Stop lifecycle APIs
 	a.stopAPIs(shutdownCtx)
-	
+
 	log.Info().Msg("Server shutdown complete")
 }
 

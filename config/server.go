@@ -21,16 +21,16 @@ type Server struct {
 	TLSMinVersion      string        `envconfig:"SERVER_TLS_MIN_VERSION" default:"1.2"`
 	SecurityHeaders    bool          `envconfig:"SERVER_SECURITY_HEADERS_ENABLED" default:"true"`
 	HSTSMaxAge         int           `envconfig:"SERVER_HSTS_MAX_AGE" default:"31536000"`
-	
+
 	// Rate Limiting Configuration
-	RateLimitEnabled    bool          `envconfig:"SERVER_RATE_LIMIT_ENABLED" default:"false"`
-	RateLimitRequests   int           `envconfig:"SERVER_RATE_LIMIT_REQUESTS" default:"100"`
-	RateLimitWindow     time.Duration `envconfig:"SERVER_RATE_LIMIT_WINDOW" default:"1m"`
-	RateLimitBurst      int           `envconfig:"SERVER_RATE_LIMIT_BURST" default:"10"`
-	RateLimitAlgorithm  string        `envconfig:"SERVER_RATE_LIMIT_ALGORITHM" default:"token_bucket"`
-	RateLimitExtractor  string        `envconfig:"SERVER_RATE_LIMIT_KEY_EXTRACTOR" default:"ip"`
-	RateLimitHeader     string        `envconfig:"SERVER_RATE_LIMIT_HEADER" default:"X-API-Key"`
-	
+	RateLimitEnabled   bool          `envconfig:"SERVER_RATE_LIMIT_ENABLED" default:"false"`
+	RateLimitRequests  int           `envconfig:"SERVER_RATE_LIMIT_REQUESTS" default:"100"`
+	RateLimitWindow    time.Duration `envconfig:"SERVER_RATE_LIMIT_WINDOW" default:"1m"`
+	RateLimitBurst     int           `envconfig:"SERVER_RATE_LIMIT_BURST" default:"10"`
+	RateLimitAlgorithm string        `envconfig:"SERVER_RATE_LIMIT_ALGORITHM" default:"token_bucket"`
+	RateLimitExtractor string        `envconfig:"SERVER_RATE_LIMIT_KEY_EXTRACTOR" default:"ip"`
+	RateLimitHeader    string        `envconfig:"SERVER_RATE_LIMIT_HEADER" default:"X-API-Key"`
+
 	*Certificate
 }
 

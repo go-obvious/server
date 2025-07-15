@@ -288,53 +288,53 @@ func TestServerConfig_TLS_Validation(t *testing.T) {
 
 func TestServerConfig_RateLimit_Configuration(t *testing.T) {
 	tests := []struct {
-		name                 string
-		algorithm            string
-		extractor            string
-		expectedAlgorithm    string
-		expectedExtractor    string
+		name              string
+		algorithm         string
+		extractor         string
+		expectedAlgorithm string
+		expectedExtractor string
 	}{
 		{
-			name:                 "Valid token_bucket algorithm",
-			algorithm:            "token_bucket",
-			extractor:            "ip",
-			expectedAlgorithm:    "token_bucket",
-			expectedExtractor:    "ip",
+			name:              "Valid token_bucket algorithm",
+			algorithm:         "token_bucket",
+			extractor:         "ip",
+			expectedAlgorithm: "token_bucket",
+			expectedExtractor: "ip",
 		},
 		{
-			name:                 "Valid sliding_window algorithm",
-			algorithm:            "sliding_window",
-			extractor:            "header",
-			expectedAlgorithm:    "sliding_window",
-			expectedExtractor:    "header",
+			name:              "Valid sliding_window algorithm",
+			algorithm:         "sliding_window",
+			extractor:         "header",
+			expectedAlgorithm: "sliding_window",
+			expectedExtractor: "header",
 		},
 		{
-			name:                 "Valid fixed_window algorithm",
-			algorithm:            "fixed_window",
-			extractor:            "custom",
-			expectedAlgorithm:    "fixed_window",
-			expectedExtractor:    "custom",
+			name:              "Valid fixed_window algorithm",
+			algorithm:         "fixed_window",
+			extractor:         "custom",
+			expectedAlgorithm: "fixed_window",
+			expectedExtractor: "custom",
 		},
 		{
-			name:                 "Invalid algorithm defaults to token_bucket",
-			algorithm:            "invalid_algorithm",
-			extractor:            "ip",
-			expectedAlgorithm:    "token_bucket",
-			expectedExtractor:    "ip",
+			name:              "Invalid algorithm defaults to token_bucket",
+			algorithm:         "invalid_algorithm",
+			extractor:         "ip",
+			expectedAlgorithm: "token_bucket",
+			expectedExtractor: "ip",
 		},
 		{
-			name:                 "Invalid extractor defaults to ip",
-			algorithm:            "token_bucket",
-			extractor:            "invalid_extractor",
-			expectedAlgorithm:    "token_bucket",
-			expectedExtractor:    "ip",
+			name:              "Invalid extractor defaults to ip",
+			algorithm:         "token_bucket",
+			extractor:         "invalid_extractor",
+			expectedAlgorithm: "token_bucket",
+			expectedExtractor: "ip",
 		},
 		{
-			name:                 "Case insensitive algorithm",
-			algorithm:            "TOKEN_BUCKET",
-			extractor:            "IP",
-			expectedAlgorithm:    "token_bucket",
-			expectedExtractor:    "ip",
+			name:              "Case insensitive algorithm",
+			algorithm:         "TOKEN_BUCKET",
+			extractor:         "IP",
+			expectedAlgorithm: "token_bucket",
+			expectedExtractor: "ip",
 		},
 	}
 
@@ -356,17 +356,17 @@ func TestServerConfig_RateLimit_Configuration(t *testing.T) {
 
 func TestServerConfig_Load_EnvconfigError(t *testing.T) {
 	config.Reset()
-	
+
 	// Test envconfig.Process() error handling (currently missing coverage)
 	// This tests the error path in Server.Load() at lines 44-46
-	
+
 	// Set an invalid duration format that will cause envconfig.Process to fail
 	os.Setenv("SERVER_READ_TIMEOUT", "invalid-duration-format")
 	defer os.Unsetenv("SERVER_READ_TIMEOUT")
-	
+
 	cfg := &config.Server{}
 	config.Register(cfg)
-	
+
 	err := config.Load()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "time: invalid duration")
@@ -375,7 +375,7 @@ func TestServerConfig_Load_EnvconfigError(t *testing.T) {
 func TestServerConfig_HTTPS_CertificateValidation(t *testing.T) {
 	// Test HTTPS certificate file validation (currently missing coverage)
 	// This tests the certificate validation paths in validateTLS() at lines 135-146
-	
+
 	tests := []struct {
 		name        string
 		setupFiles  func() (certFile, keyFile string, cleanup func())
@@ -388,16 +388,16 @@ func TestServerConfig_HTTPS_CertificateValidation(t *testing.T) {
 				// Create temporary certificate files
 				certFile := "/tmp/test_cert.pem"
 				keyFile := "/tmp/test_key.pem"
-				
+
 				// Create empty files (content doesn't matter for validation)
 				os.WriteFile(certFile, []byte("cert content"), 0644)
 				os.WriteFile(keyFile, []byte("key content"), 0644)
-				
+
 				cleanup := func() {
 					os.Remove(certFile)
 					os.Remove(keyFile)
 				}
-				
+
 				return certFile, keyFile, cleanup
 			},
 			expectError: false,
@@ -407,14 +407,14 @@ func TestServerConfig_HTTPS_CertificateValidation(t *testing.T) {
 			setupFiles: func() (string, string, func()) {
 				certFile := "/tmp/nonexistent_cert.pem"
 				keyFile := "/tmp/test_key.pem"
-				
+
 				// Create only key file
 				os.WriteFile(keyFile, []byte("key content"), 0644)
-				
+
 				cleanup := func() {
 					os.Remove(keyFile)
 				}
-				
+
 				return certFile, keyFile, cleanup
 			},
 			expectError: true,
@@ -425,14 +425,14 @@ func TestServerConfig_HTTPS_CertificateValidation(t *testing.T) {
 			setupFiles: func() (string, string, func()) {
 				certFile := "/tmp/test_cert.pem"
 				keyFile := "/tmp/nonexistent_key.pem"
-				
+
 				// Create only cert file
 				os.WriteFile(certFile, []byte("cert content"), 0644)
-				
+
 				cleanup := func() {
 					os.Remove(certFile)
 				}
-				
+
 				return certFile, keyFile, cleanup
 			},
 			expectError: true,
@@ -447,14 +447,14 @@ func TestServerConfig_HTTPS_CertificateValidation(t *testing.T) {
 			expectError: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config.Reset()
-			
+
 			certFile, keyFile, cleanup := tt.setupFiles()
 			defer cleanup()
-			
+
 			// Set environment variables for HTTPS mode with certificate
 			if tt.name == "HTTP mode - no certificate validation" {
 				os.Setenv("SERVER_MODE", "http")
@@ -462,23 +462,23 @@ func TestServerConfig_HTTPS_CertificateValidation(t *testing.T) {
 				os.Setenv("SERVER_MODE", "https")
 			}
 			defer os.Unsetenv("SERVER_MODE")
-			
+
 			os.Setenv("SERVER_CERTIFICATE_CERT_FILE", certFile)
 			defer os.Unsetenv("SERVER_CERTIFICATE_CERT_FILE")
-			
+
 			os.Setenv("SERVER_CERTIFICATE_KEY_FILE", keyFile)
 			defer os.Unsetenv("SERVER_CERTIFICATE_KEY_FILE")
-			
+
 			// Set TLS version to pass other validations
 			os.Setenv("SERVER_TLS_MIN_VERSION", "1.2")
 			defer os.Unsetenv("SERVER_TLS_MIN_VERSION")
-			
+
 			// Create fresh config and register it
 			cfg := &config.Server{}
 			config.Register(cfg)
-			
+
 			err := config.Load()
-			
+
 			if tt.expectError {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorMsg)
@@ -656,28 +656,28 @@ func TestServerConfig_RateLimit_Validation(t *testing.T) {
 			// Set environment variables for the config
 			os.Setenv("SERVER_RATE_LIMIT_ENABLED", fmt.Sprintf("%t", cfg.RateLimitEnabled))
 			defer os.Unsetenv("SERVER_RATE_LIMIT_ENABLED")
-			
+
 			os.Setenv("SERVER_RATE_LIMIT_REQUESTS", fmt.Sprintf("%d", cfg.RateLimitRequests))
 			defer os.Unsetenv("SERVER_RATE_LIMIT_REQUESTS")
-			
+
 			os.Setenv("SERVER_RATE_LIMIT_WINDOW", cfg.RateLimitWindow.String())
 			defer os.Unsetenv("SERVER_RATE_LIMIT_WINDOW")
-			
+
 			if cfg.RateLimitBurst != 0 {
 				os.Setenv("SERVER_RATE_LIMIT_BURST", fmt.Sprintf("%d", cfg.RateLimitBurst))
 				defer os.Unsetenv("SERVER_RATE_LIMIT_BURST")
 			}
-			
+
 			if cfg.RateLimitAlgorithm != "" {
 				os.Setenv("SERVER_RATE_LIMIT_ALGORITHM", cfg.RateLimitAlgorithm)
 				defer os.Unsetenv("SERVER_RATE_LIMIT_ALGORITHM")
 			}
-			
+
 			if cfg.RateLimitExtractor != "" {
 				os.Setenv("SERVER_RATE_LIMIT_KEY_EXTRACTOR", cfg.RateLimitExtractor)
 				defer os.Unsetenv("SERVER_RATE_LIMIT_KEY_EXTRACTOR")
 			}
-			
+
 			// Always set the header name even if empty to test empty case
 			os.Setenv("SERVER_RATE_LIMIT_HEADER", cfg.RateLimitHeader)
 			defer os.Unsetenv("SERVER_RATE_LIMIT_HEADER")

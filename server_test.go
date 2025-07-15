@@ -50,34 +50,34 @@ func (t *TestAPI) Register(app server.Server) error {
 func (t *TestAPI) Start(ctx context.Context) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	
+
 	if t.startError != nil {
 		return t.startError
 	}
-	
+
 	t.started = true
 	select {
 	case t.startCalled <- struct{}{}:
 	default:
 	}
-	
+
 	return nil
 }
 
 func (t *TestAPI) Stop(ctx context.Context) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	
+
 	if t.stopError != nil {
 		return t.stopError
 	}
-	
+
 	t.stopped = true
 	select {
 	case t.stopCalled <- struct{}{}:
 	default:
 	}
-	
+
 	return nil
 }
 

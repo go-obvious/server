@@ -97,9 +97,9 @@ func TestService_Register_MultipleMounts(t *testing.T) {
 		APIName: "multi-api",
 		Router:  nil,
 		Mounts: map[string]*chi.Mux{
-			"/api/v1":   v1Router,
-			"/api/v2":   v2Router,
-			"/admin":    adminRouter,
+			"/api/v1": v1Router,
+			"/api/v2": v2Router,
+			"/admin":  adminRouter,
 		},
 	}
 

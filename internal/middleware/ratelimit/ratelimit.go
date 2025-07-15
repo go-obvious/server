@@ -66,7 +66,7 @@ func NewTokenBucketLimiter(requests int, window time.Duration, burst int) *Token
 	if capacity <= 0 {
 		capacity = requests
 	}
-	
+
 	return &TokenBucketLimiter{
 		buckets:  make(map[string]*tokenBucket),
 		rate:     rate,
@@ -78,10 +78,10 @@ func NewTokenBucketLimiter(requests int, window time.Duration, burst int) *Token
 func (tbl *TokenBucketLimiter) Allow(key string) (bool, time.Duration) {
 	tbl.mu.Lock()
 	defer tbl.mu.Unlock()
-	
+
 	now := time.Now()
 	bucket, exists := tbl.buckets[key]
-	
+
 	if !exists {
 		bucket = &tokenBucket{
 			tokens:   float64(tbl.capacity),
@@ -89,22 +89,22 @@ func (tbl *TokenBucketLimiter) Allow(key string) (bool, time.Duration) {
 		}
 		tbl.buckets[key] = bucket
 	}
-	
+
 	// Add tokens based on elapsed time
 	elapsed := now.Sub(bucket.lastSeen).Seconds()
 	bucket.tokens += elapsed * tbl.rate
-	
+
 	if bucket.tokens > float64(tbl.capacity) {
 		bucket.tokens = float64(tbl.capacity)
 	}
-	
+
 	bucket.lastSeen = now
-	
+
 	if bucket.tokens >= 1.0 {
 		bucket.tokens--
 		return true, 0
 	}
-	
+
 	// Calculate time until next token (ensure minimum wait time)
 	tokensNeeded := 1.0 - bucket.tokens
 	waitTime := time.Duration(tokensNeeded/tbl.rate*1000) * time.Millisecond
@@ -144,17 +144,17 @@ func NewSlidingWindowLimiter(requests int, window time.Duration) *SlidingWindowL
 func (swl *SlidingWindowLimiter) Allow(key string) (bool, time.Duration) {
 	swl.mu.Lock()
 	defer swl.mu.Unlock()
-	
+
 	now := time.Now()
 	window, exists := swl.windows[key]
-	
+
 	if !exists {
 		window = &slidingWindow{
 			timestamps: make([]time.Time, 0),
 		}
 		swl.windows[key] = window
 	}
-	
+
 	// Remove expired timestamps
 	cutoff := now.Add(-swl.window)
 	validTimestamps := window.timestamps[:0]
@@ -164,12 +164,12 @@ func (swl *SlidingWindowLimiter) Allow(key string) (bool, time.Duration) {
 		}
 	}
 	window.timestamps = validTimestamps
-	
+
 	if len(window.timestamps) < swl.requests {
 		window.timestamps = append(window.timestamps, now)
 		return true, 0
 	}
-	
+
 	// Calculate time until oldest request expires
 	oldestTime := window.timestamps[0]
 	waitTime := swl.window - now.Sub(oldestTime)
@@ -191,7 +191,7 @@ type FixedWindowLimiter struct {
 }
 
 type fixedWindow struct {
-	count     int
+	count       int
 	windowStart time.Time
 }
 
@@ -207,10 +207,10 @@ func NewFixedWindowLimiter(requests int, window time.Duration) *FixedWindowLimit
 func (fwl *FixedWindowLimiter) Allow(key string) (bool, time.Duration) {
 	fwl.mu.Lock()
 	defer fwl.mu.Unlock()
-	
+
 	now := time.Now()
 	window, exists := fwl.windows[key]
-	
+
 	if !exists {
 		window = &fixedWindow{
 			count:       0,
@@ -218,18 +218,18 @@ func (fwl *FixedWindowLimiter) Allow(key string) (bool, time.Duration) {
 		}
 		fwl.windows[key] = window
 	}
-	
+
 	// Check if window has expired
 	if now.Sub(window.windowStart) >= fwl.window {
 		window.count = 0
 		window.windowStart = now
 	}
-	
+
 	if window.count < fwl.requests {
 		window.count++
 		return true, 0
 	}
-	
+
 	// Calculate time until window resets
 	waitTime := fwl.window - now.Sub(window.windowStart)
 	return false, waitTime
@@ -271,20 +271,20 @@ func extractIPFromRequest(r *http.Request) string {
 			return ip.String()
 		}
 	}
-	
+
 	if xri := r.Header.Get("X-Real-IP"); xri != "" {
 		if ip := net.ParseIP(xri); ip != nil {
 			return ip.String()
 		}
 	}
-	
+
 	// Fall back to RemoteAddr
 	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
 		if ip := net.ParseIP(host); ip != nil {
 			return ip.String()
 		}
 	}
-	
+
 	return r.RemoteAddr
 }
 
@@ -309,29 +309,29 @@ func Middleware(config Config) func(next http.Handler) http.Handler {
 			return next
 		}
 	}
-	
+
 	limiter := createLimiter(config)
-	
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			key := extractKey(r, config)
 			allowed, waitTime := limiter.Allow(key)
-			
+
 			if !allowed {
 				// Set rate limit headers
 				w.Header().Set("X-RateLimit-Limit", strconv.Itoa(config.Requests))
 				w.Header().Set("X-RateLimit-Window", config.Window.String())
 				w.Header().Set("X-RateLimit-Retry-After", strconv.Itoa(int(waitTime.Seconds())))
-				
+
 				// Return 429 Too Many Requests
 				http.Error(w, fmt.Sprintf("Rate limit exceeded. Try again in %v", waitTime), http.StatusTooManyRequests)
 				return
 			}
-			
+
 			// Add rate limit info headers for successful requests
 			w.Header().Set("X-RateLimit-Limit", strconv.Itoa(config.Requests))
 			w.Header().Set("X-RateLimit-Window", config.Window.String())
-			
+
 			next.ServeHTTP(w, r)
 		})
 	}

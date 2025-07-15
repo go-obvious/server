@@ -76,7 +76,7 @@ func TestReply(t *testing.T) {
 			request.Reply(req, rr, tt.data, tt.statusCode)
 
 			assert.Equal(t, tt.expectedCode, rr.Code)
-			
+
 			if tt.expectedBody != "" {
 				assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
 				assert.JSONEq(t, tt.expectedBody, strings.TrimSpace(rr.Body.String()))
@@ -182,20 +182,20 @@ func TestReplyGzip(t *testing.T) {
 			request.ReplyGzip(req, rr, tt.data, tt.statusCode, tt.pretty)
 
 			assert.Equal(t, tt.expectedCode, rr.Code)
-			
+
 			if tt.statusCode != http.StatusNoContent && tt.data != nil {
 				assert.Equal(t, "gzip", rr.Header().Get("Content-Encoding"))
 				// ReplyGzip doesn't set Content-Type header, check if it's empty or default
 				// Let's not assert on Content-Type since it's not set by replyCompressed
-				
+
 				// Decompress and verify content
 				reader, err := gzip.NewReader(rr.Body)
 				require.NoError(t, err)
 				defer reader.Close()
-				
+
 				decompressed, err := io.ReadAll(reader)
 				require.NoError(t, err)
-				
+
 				var result map[string]interface{}
 				err = json.Unmarshal(decompressed, &result)
 				require.NoError(t, err)
@@ -323,40 +323,40 @@ func TestReplyBytes(t *testing.T) {
 
 func TestReplyBytesGzip(t *testing.T) {
 	tests := []struct {
-		name            string
-		data            []byte
-		statusCode      int
-		contentType     string
-		expectedCode    int
-		expectedType    string
-		shouldCompress  bool
+		name           string
+		data           []byte
+		statusCode     int
+		contentType    string
+		expectedCode   int
+		expectedType   string
+		shouldCompress bool
 	}{
 		{
-			name:            "Compressible data",
-			data:            []byte("Hello, Gzip World! This is compressible text."),
-			statusCode:      http.StatusOK,
-			contentType:     "text/plain",
-			expectedCode:    http.StatusOK,
-			expectedType:    "text/plain",
-			shouldCompress:  true,
+			name:           "Compressible data",
+			data:           []byte("Hello, Gzip World! This is compressible text."),
+			statusCode:     http.StatusOK,
+			contentType:    "text/plain",
+			expectedCode:   http.StatusOK,
+			expectedType:   "text/plain",
+			shouldCompress: true,
 		},
 		{
-			name:            "Small data",
-			data:            []byte("Hi"),
-			statusCode:      http.StatusOK,
-			contentType:     "text/plain",
-			expectedCode:    http.StatusOK,
-			expectedType:    "text/plain",
-			shouldCompress:  true,
+			name:           "Small data",
+			data:           []byte("Hi"),
+			statusCode:     http.StatusOK,
+			contentType:    "text/plain",
+			expectedCode:   http.StatusOK,
+			expectedType:   "text/plain",
+			shouldCompress: true,
 		},
 		{
-			name:            "Empty data",
-			data:            []byte{},
-			statusCode:      http.StatusOK,
-			contentType:     "text/plain",
-			expectedCode:    http.StatusOK,
-			expectedType:    "text/plain",
-			shouldCompress:  true,
+			name:           "Empty data",
+			data:           []byte{},
+			statusCode:     http.StatusOK,
+			contentType:    "text/plain",
+			expectedCode:   http.StatusOK,
+			expectedType:   "text/plain",
+			shouldCompress: true,
 		},
 	}
 
@@ -370,15 +370,15 @@ func TestReplyBytesGzip(t *testing.T) {
 
 			assert.Equal(t, tt.expectedCode, rr.Code)
 			assert.Equal(t, tt.expectedType, rr.Header().Get("Content-Type"))
-			
+
 			if tt.shouldCompress {
 				assert.Equal(t, "gzip", rr.Header().Get("Content-Encoding"))
-				
+
 				// Decompress and verify original content
 				reader, err := gzip.NewReader(rr.Body)
 				require.NoError(t, err)
 				defer reader.Close()
-				
+
 				decompressed, err := io.ReadAll(reader)
 				require.NoError(t, err)
 				assert.Equal(t, tt.data, decompressed)
@@ -552,7 +552,7 @@ func TestResponseTypes_JSONSerialization(t *testing.T) {
 
 		data, err := json.Marshal(response)
 		require.NoError(t, err)
-		
+
 		expected := `{"status":{"success":true},"data":"test data"}`
 		assert.JSONEq(t, expected, string(data))
 	})
@@ -570,11 +570,11 @@ func TestResponseTypes_JSONSerialization(t *testing.T) {
 
 		data, err := json.Marshal(response)
 		require.NoError(t, err)
-		
+
 		var result map[string]interface{}
 		err = json.Unmarshal(data, &result)
 		require.NoError(t, err)
-		
+
 		assert.Equal(t, true, result["status"].(map[string]interface{})["success"])
 		assert.Equal(t, float64(2), result["count"])
 		assert.Equal(t, []interface{}{"item1", "item2"}, result["data"])

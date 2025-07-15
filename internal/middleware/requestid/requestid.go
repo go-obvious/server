@@ -89,17 +89,17 @@ func extractCorrelationID(r *http.Request) string {
 	if correlationID := r.Header.Get(CorrelationIDHeader); correlationID != "" {
 		return correlationID
 	}
-	
+
 	// Try trace ID header
 	if traceID := r.Header.Get(TraceIDHeader); traceID != "" {
 		return traceID
 	}
-	
+
 	// Try request ID header
 	if requestID := r.Header.Get(RequestIDHeader); requestID != "" {
 		return requestID
 	}
-	
+
 	return ""
 }
 
@@ -110,30 +110,30 @@ func Middleware(next http.Handler) http.Handler {
 		if reqID == "" {
 			reqID = generateID()
 		}
-		
+
 		// Extract or generate correlation ID
 		correlationID := extractCorrelationID(r)
 		if correlationID == "" {
 			correlationID = generateID()
 		}
-		
+
 		// Extract trace ID if present
 		traceID := r.Header.Get(TraceIDHeader)
-		
+
 		// Create request context
 		reqCtx := &Context{
 			RequestID:     reqID,
 			CorrelationID: correlationID,
 			TraceID:       traceID,
 		}
-		
+
 		// Set response headers for correlation tracking
 		w.Header().Set(CorrelationIDHeader, correlationID)
 		w.Header().Set(RequestIDHeader, reqID)
 		if traceID != "" {
 			w.Header().Set(TraceIDHeader, traceID)
 		}
-		
+
 		// Save context and continue
 		ctx := SaveContext(r.Context(), reqCtx)
 		next.ServeHTTP(w, r.WithContext(ctx))
