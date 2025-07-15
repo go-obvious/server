@@ -12,9 +12,9 @@ A _**simple library**_ for quickly developing **secure web services**. Supports 
 
 **⚡ Zero Config** - Sensible defaults for development, configurable for production
 
-**🛡️ Production Ready** - Timeouts, health checks, structured logging, and panic recovery
+**🛡️ Production Ready** - Timeouts, health checks, structured logging, panic recovery, and request rate limiting
 
-**🚀 Developer Friendly** - Fluent API, environment-based config, and comprehensive examples
+**🚀 Developer Friendly** - Fluent API, environment-based config, and community examples
 
 The goal is simple: enable development of **secure** Service APIs - not the scaffolding.
 
@@ -45,11 +45,21 @@ The server can be configured using environment variables:
 - `SERVER_WRITE_TIMEOUT` - HTTP write timeout (default: `30s`)
 - `SERVER_IDLE_TIMEOUT` - HTTP idle timeout (default: `120s`)
 
+**Rate Limiting Configuration:**
+- `SERVER_RATE_LIMIT_ENABLED` - Enable request rate limiting (default: `false`)
+- `SERVER_RATE_LIMIT_REQUESTS` - Max requests per window (default: `100`)
+- `SERVER_RATE_LIMIT_WINDOW` - Time window duration (default: `1m`)
+- `SERVER_RATE_LIMIT_BURST` - Burst capacity for token bucket (default: `10`)
+- `SERVER_RATE_LIMIT_ALGORITHM` - Algorithm: `token_bucket`, `sliding_window`, `fixed_window` (default: `token_bucket`)
+- `SERVER_RATE_LIMIT_KEY_EXTRACTOR` - Key extractor: `ip`, `header`, `custom` (default: `ip`)
+- `SERVER_RATE_LIMIT_HEADER` - Header name for header extractor (default: `X-API-Key`)
+
 **Security Features:**
 - CORS wildcard `*` origins are blocked for security
 - TLS 1.2+ with secure cipher suites and curves
 - Automatic security headers: HSTS, CSP, X-Frame-Options, etc.
 - Certificate validation at startup
+- Configurable rate limiting with multiple algorithms and key extractors
 
 ## 🚀 Quick Start
 
@@ -96,14 +106,21 @@ export SERVER_TLS_MIN_VERSION=1.3
 go run main.go  # Now runs with TLS 1.3, HSTS, and security headers
 ```
 
+### 🛡️ Rate Limited API Server
+```bash
+# Enable rate limiting with token bucket algorithm
+export SERVER_RATE_LIMIT_ENABLED=true
+export SERVER_RATE_LIMIT_REQUESTS=50
+export SERVER_RATE_LIMIT_WINDOW=1m
+export SERVER_RATE_LIMIT_ALGORITHM=token_bucket
+
+go run main.go  # Now limits to 50 requests per minute per IP
+```
+
 ## 📚 Examples & Documentation
 
 ### Examples
-- **[examples-local/](./examples-local/)** - Complete example applications
-  - [Basic HTTP Server](./examples-local/basic-http/) - Simple API with security features
-  - [Secure HTTPS Server](./examples-local/secure-https/) - TLS, certificates, and advanced security
-  - [Configuration Examples](./examples-local/configuration-examples.md) - Real-world deployment configs
+- **[examples/](./examples/)** - Community examples repository (git submodule)
+- **[github.com/go-obvious/server-example](https://github.com/go-obvious/server-example)** - Additional examples and tutorials
 
-### External Examples  
-- **[examples/](./examples/)** - Official examples repository (submodule)
-- **github.com/go-obvious/server-example** - Additional examples and tutorials
+All examples including basic HTTP servers, HTTPS configurations, rate limiting, and real-world deployment configurations are maintained in the community examples repository.

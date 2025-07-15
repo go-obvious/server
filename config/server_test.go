@@ -285,3 +285,281 @@ func TestServerConfig_TLS_Validation(t *testing.T) {
 		})
 	}
 }
+
+func TestServerConfig_RateLimit_Configuration(t *testing.T) {
+	tests := []struct {
+		name                 string
+		algorithm            string
+		extractor            string
+		expectedAlgorithm    string
+		expectedExtractor    string
+	}{
+		{
+			name:                 "Valid token_bucket algorithm",
+			algorithm:            "token_bucket",
+			extractor:            "ip",
+			expectedAlgorithm:    "token_bucket",
+			expectedExtractor:    "ip",
+		},
+		{
+			name:                 "Valid sliding_window algorithm",
+			algorithm:            "sliding_window",
+			extractor:            "header",
+			expectedAlgorithm:    "sliding_window",
+			expectedExtractor:    "header",
+		},
+		{
+			name:                 "Valid fixed_window algorithm",
+			algorithm:            "fixed_window",
+			extractor:            "custom",
+			expectedAlgorithm:    "fixed_window",
+			expectedExtractor:    "custom",
+		},
+		{
+			name:                 "Invalid algorithm defaults to token_bucket",
+			algorithm:            "invalid_algorithm",
+			extractor:            "ip",
+			expectedAlgorithm:    "token_bucket",
+			expectedExtractor:    "ip",
+		},
+		{
+			name:                 "Invalid extractor defaults to ip",
+			algorithm:            "token_bucket",
+			extractor:            "invalid_extractor",
+			expectedAlgorithm:    "token_bucket",
+			expectedExtractor:    "ip",
+		},
+		{
+			name:                 "Case insensitive algorithm",
+			algorithm:            "TOKEN_BUCKET",
+			extractor:            "IP",
+			expectedAlgorithm:    "token_bucket",
+			expectedExtractor:    "ip",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Server{
+				RateLimitAlgorithm: tt.algorithm,
+				RateLimitExtractor: tt.extractor,
+			}
+
+			algorithm := cfg.GetRateLimitAlgorithm()
+			extractor := cfg.GetRateLimitKeyExtractor()
+
+			assert.Equal(t, tt.expectedAlgorithm, algorithm)
+			assert.Equal(t, tt.expectedExtractor, extractor)
+		})
+	}
+}
+
+func TestServerConfig_RateLimit_Validation(t *testing.T) {
+	tests := []struct {
+		name        string
+		setupConfig func() *config.Server
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "Valid rate limiting configuration",
+			setupConfig: func() *config.Server {
+				return &config.Server{
+					RateLimitEnabled:   true,
+					RateLimitRequests:  100,
+					RateLimitWindow:    60000000000, // 1 minute in nanoseconds
+					RateLimitBurst:     10,
+					RateLimitAlgorithm: "token_bucket",
+					RateLimitExtractor: "ip",
+					RateLimitHeader:    "X-API-Key",
+				}
+			},
+			expectError: false,
+		},
+		{
+			name: "Rate limiting disabled - no validation",
+			setupConfig: func() *config.Server {
+				return &config.Server{
+					RateLimitEnabled:  false,
+					RateLimitRequests: -1, // Invalid but should be ignored when disabled
+				}
+			},
+			expectError: false,
+		},
+		{
+			name: "Invalid requests - zero",
+			setupConfig: func() *config.Server {
+				return &config.Server{
+					RateLimitEnabled:  true,
+					RateLimitRequests: 0,
+					RateLimitWindow:   60000000000,
+				}
+			},
+			expectError: true,
+			errorMsg:    "rate limit requests must be greater than 0",
+		},
+		{
+			name: "Invalid requests - negative",
+			setupConfig: func() *config.Server {
+				return &config.Server{
+					RateLimitEnabled:  true,
+					RateLimitRequests: -10,
+					RateLimitWindow:   60000000000,
+				}
+			},
+			expectError: true,
+			errorMsg:    "rate limit requests must be greater than 0",
+		},
+		{
+			name: "Invalid window - zero",
+			setupConfig: func() *config.Server {
+				return &config.Server{
+					RateLimitEnabled:  true,
+					RateLimitRequests: 100,
+					RateLimitWindow:   0,
+				}
+			},
+			expectError: true,
+			errorMsg:    "rate limit window must be greater than 0",
+		},
+		{
+			name: "Invalid window - negative",
+			setupConfig: func() *config.Server {
+				return &config.Server{
+					RateLimitEnabled:  true,
+					RateLimitRequests: 100,
+					RateLimitWindow:   -1000000000,
+				}
+			},
+			expectError: true,
+			errorMsg:    "rate limit window must be greater than 0",
+		},
+		{
+			name: "Invalid burst - negative",
+			setupConfig: func() *config.Server {
+				return &config.Server{
+					RateLimitEnabled:  true,
+					RateLimitRequests: 100,
+					RateLimitWindow:   60000000000,
+					RateLimitBurst:    -5,
+				}
+			},
+			expectError: true,
+			errorMsg:    "rate limit burst must be non-negative",
+		},
+		{
+			name: "Valid burst - zero",
+			setupConfig: func() *config.Server {
+				return &config.Server{
+					RateLimitEnabled:  true,
+					RateLimitRequests: 100,
+					RateLimitWindow:   60000000000,
+					RateLimitBurst:    0, // Valid - uses requests as capacity
+				}
+			},
+			expectError: false,
+		},
+		{
+			name: "Invalid algorithm",
+			setupConfig: func() *config.Server {
+				return &config.Server{
+					RateLimitEnabled:   true,
+					RateLimitRequests:  100,
+					RateLimitWindow:    60000000000,
+					RateLimitAlgorithm: "invalid_algorithm",
+				}
+			},
+			expectError: true,
+			errorMsg:    "rate limit algorithm must be one of: token_bucket, sliding_window, fixed_window",
+		},
+		{
+			name: "Invalid key extractor",
+			setupConfig: func() *config.Server {
+				return &config.Server{
+					RateLimitEnabled:   true,
+					RateLimitRequests:  100,
+					RateLimitWindow:    60000000000,
+					RateLimitExtractor: "invalid_extractor",
+				}
+			},
+			expectError: true,
+			errorMsg:    "rate limit key extractor must be one of: ip, header, custom",
+		},
+		{
+			name: "Header extractor missing header name",
+			setupConfig: func() *config.Server {
+				return &config.Server{
+					RateLimitEnabled:   true,
+					RateLimitRequests:  100,
+					RateLimitWindow:    60000000000,
+					RateLimitExtractor: "header",
+					RateLimitHeader:    "", // Missing header name
+				}
+			},
+			expectError: true,
+			errorMsg:    "rate limit header name is required when using header key extractor",
+		},
+		{
+			name: "Header extractor with valid header name",
+			setupConfig: func() *config.Server {
+				return &config.Server{
+					RateLimitEnabled:   true,
+					RateLimitRequests:  100,
+					RateLimitWindow:    60000000000,
+					RateLimitExtractor: "header",
+					RateLimitHeader:    "X-API-Key",
+				}
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := tt.setupConfig()
+
+			// Set environment variables for the config
+			os.Setenv("SERVER_RATE_LIMIT_ENABLED", fmt.Sprintf("%t", cfg.RateLimitEnabled))
+			defer os.Unsetenv("SERVER_RATE_LIMIT_ENABLED")
+			
+			os.Setenv("SERVER_RATE_LIMIT_REQUESTS", fmt.Sprintf("%d", cfg.RateLimitRequests))
+			defer os.Unsetenv("SERVER_RATE_LIMIT_REQUESTS")
+			
+			os.Setenv("SERVER_RATE_LIMIT_WINDOW", cfg.RateLimitWindow.String())
+			defer os.Unsetenv("SERVER_RATE_LIMIT_WINDOW")
+			
+			if cfg.RateLimitBurst != 0 {
+				os.Setenv("SERVER_RATE_LIMIT_BURST", fmt.Sprintf("%d", cfg.RateLimitBurst))
+				defer os.Unsetenv("SERVER_RATE_LIMIT_BURST")
+			}
+			
+			if cfg.RateLimitAlgorithm != "" {
+				os.Setenv("SERVER_RATE_LIMIT_ALGORITHM", cfg.RateLimitAlgorithm)
+				defer os.Unsetenv("SERVER_RATE_LIMIT_ALGORITHM")
+			}
+			
+			if cfg.RateLimitExtractor != "" {
+				os.Setenv("SERVER_RATE_LIMIT_KEY_EXTRACTOR", cfg.RateLimitExtractor)
+				defer os.Unsetenv("SERVER_RATE_LIMIT_KEY_EXTRACTOR")
+			}
+			
+			// Always set the header name even if empty to test empty case
+			os.Setenv("SERVER_RATE_LIMIT_HEADER", cfg.RateLimitHeader)
+			defer os.Unsetenv("SERVER_RATE_LIMIT_HEADER")
+
+			// Create fresh config and register it
+			freshCfg := &config.Server{}
+			config.Register(freshCfg)
+
+			// Test Load which calls validateRateLimit internally
+			err := config.Load()
+
+			if tt.expectError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMsg)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}

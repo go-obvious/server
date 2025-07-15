@@ -13,6 +13,7 @@ import (
 	"github.com/go-obvious/server/internal/healthz"
 	"github.com/go-obvious/server/internal/middleware/apicaller"
 	"github.com/go-obvious/server/internal/middleware/panic"
+	"github.com/go-obvious/server/internal/middleware/ratelimit"
 	"github.com/go-obvious/server/internal/middleware/requestid"
 	"github.com/go-obvious/server/internal/middleware/security"
 	"github.com/go-obvious/server/internal/version"
@@ -74,6 +75,18 @@ func New(
 
 	//app.router.Use(middleware.Logger)
 	app.router.Use(panic.Middleware)
+
+	// Rate limiting middleware (before other middleware to protect the entire pipeline)
+	rateLimitConfig := ratelimit.Config{
+		Enabled:      cfg.RateLimitEnabled,
+		Requests:     cfg.RateLimitRequests,
+		Window:       cfg.RateLimitWindow,
+		Burst:        cfg.RateLimitBurst,
+		Algorithm:    ratelimit.Algorithm(cfg.GetRateLimitAlgorithm()),
+		KeyExtractor: ratelimit.KeyExtractor(cfg.GetRateLimitKeyExtractor()),
+		HeaderName:   cfg.RateLimitHeader,
+	}
+	app.router.Use(ratelimit.Middleware(rateLimitConfig))
 
 	// Security headers middleware
 	securityConfig := security.Config{

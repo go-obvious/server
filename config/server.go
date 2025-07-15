@@ -21,6 +21,16 @@ type Server struct {
 	TLSMinVersion      string        `envconfig:"SERVER_TLS_MIN_VERSION" default:"1.2"`
 	SecurityHeaders    bool          `envconfig:"SERVER_SECURITY_HEADERS_ENABLED" default:"true"`
 	HSTSMaxAge         int           `envconfig:"SERVER_HSTS_MAX_AGE" default:"31536000"`
+	
+	// Rate Limiting Configuration
+	RateLimitEnabled    bool          `envconfig:"SERVER_RATE_LIMIT_ENABLED" default:"false"`
+	RateLimitRequests   int           `envconfig:"SERVER_RATE_LIMIT_REQUESTS" default:"100"`
+	RateLimitWindow     time.Duration `envconfig:"SERVER_RATE_LIMIT_WINDOW" default:"1m"`
+	RateLimitBurst      int           `envconfig:"SERVER_RATE_LIMIT_BURST" default:"10"`
+	RateLimitAlgorithm  string        `envconfig:"SERVER_RATE_LIMIT_ALGORITHM" default:"token_bucket"`
+	RateLimitExtractor  string        `envconfig:"SERVER_RATE_LIMIT_KEY_EXTRACTOR" default:"ip"`
+	RateLimitHeader     string        `envconfig:"SERVER_RATE_LIMIT_HEADER" default:"X-API-Key"`
+	
 	*Certificate
 }
 
@@ -41,7 +51,12 @@ func (c *Server) Load() error {
 	}
 
 	// Validate TLS configuration
-	return c.validateTLS()
+	if err := c.validateTLS(); err != nil {
+		return err
+	}
+
+	// Validate rate limiting configuration
+	return c.validateRateLimit()
 }
 
 // GetCORSOrigins returns the CORS allowed origins as a slice
@@ -138,6 +153,69 @@ func (c *Server) validateTLS() error {
 	// Validate HSTS max age
 	if c.HSTSMaxAge < 0 {
 		return errors.New("HSTS max age must be non-negative")
+	}
+
+	return nil
+}
+
+// GetRateLimitAlgorithm returns the rate limiting algorithm
+func (c *Server) GetRateLimitAlgorithm() string {
+	algorithm := strings.ToLower(c.RateLimitAlgorithm)
+	switch algorithm {
+	case "token_bucket", "sliding_window", "fixed_window":
+		return algorithm
+	default:
+		return "token_bucket" // Safe default
+	}
+}
+
+// GetRateLimitKeyExtractor returns the rate limiting key extractor
+func (c *Server) GetRateLimitKeyExtractor() string {
+	extractor := strings.ToLower(c.RateLimitExtractor)
+	switch extractor {
+	case "ip", "header", "custom":
+		return extractor
+	default:
+		return "ip" // Safe default
+	}
+}
+
+// validateRateLimit validates the rate limiting configuration
+func (c *Server) validateRateLimit() error {
+	if !c.RateLimitEnabled {
+		return nil // Skip validation if rate limiting is disabled
+	}
+
+	// Validate requests per window
+	if c.RateLimitRequests <= 0 {
+		return errors.New("rate limit requests must be greater than 0")
+	}
+
+	// Validate window duration
+	if c.RateLimitWindow <= 0 {
+		return errors.New("rate limit window must be greater than 0")
+	}
+
+	// Validate burst size
+	if c.RateLimitBurst < 0 {
+		return errors.New("rate limit burst must be non-negative")
+	}
+
+	// Validate algorithm
+	algorithm := strings.ToLower(c.RateLimitAlgorithm)
+	if algorithm != "token_bucket" && algorithm != "sliding_window" && algorithm != "fixed_window" {
+		return errors.New("rate limit algorithm must be one of: token_bucket, sliding_window, fixed_window")
+	}
+
+	// Validate key extractor
+	extractor := strings.ToLower(c.RateLimitExtractor)
+	if extractor != "ip" && extractor != "header" && extractor != "custom" {
+		return errors.New("rate limit key extractor must be one of: ip, header, custom")
+	}
+
+	// Validate header name if using header extractor
+	if extractor == "header" && c.RateLimitHeader == "" {
+		return errors.New("rate limit header name is required when using header key extractor")
 	}
 
 	return nil
