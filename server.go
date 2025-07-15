@@ -14,6 +14,7 @@ import (
 	"github.com/go-obvious/server/internal/middleware/apicaller"
 	"github.com/go-obvious/server/internal/middleware/panic"
 	"github.com/go-obvious/server/internal/middleware/requestid"
+	"github.com/go-obvious/server/internal/middleware/security"
 	"github.com/go-obvious/server/internal/version"
 )
 
@@ -73,8 +74,16 @@ func New(
 
 	//app.router.Use(middleware.Logger)
 	app.router.Use(panic.Middleware)
+
+	// Security headers middleware
+	securityConfig := security.Config{
+		Enabled:    cfg.SecurityHeaders,
+		HSTSMaxAge: cfg.HSTSMaxAge,
+	}
+	app.router.Use(security.Middleware(securityConfig))
+
 	cors := cors.New(cors.Options{
-		AllowedOrigins: []string{"*"},
+		AllowedOrigins: cfg.GetCORSOrigins(),
 		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{
 			"Origin",

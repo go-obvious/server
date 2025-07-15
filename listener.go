@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/go-obvious/gateway"
+	"github.com/go-obvious/server/config"
 )
 
 const (
@@ -44,4 +45,23 @@ func TLSListener(readTimeout, writeTimeout, idleTimeout time.Duration, tlsProvid
 		}
 		return server.ListenAndServeTLS("", "")
 	}
+}
+
+// SecureTLSListener creates a TLS listener with secure defaults and configurable timeouts
+func SecureTLSListener(cfg *config.Server) ListenAndServeFunc {
+	return TLSListener(cfg.ReadTimeout, cfg.WriteTimeout, cfg.IdleTimeout, func() *tls.Config {
+		// Start with secure defaults
+		tlsConfig := cfg.GetSecureTLSConfig()
+
+		// If certificate files are provided, load them
+		if cfg.Certificate != nil && cfg.CertFile != "" && cfg.KeyFile != "" {
+			cert, err := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
+			if err != nil {
+				log.Fatalf("Failed to load TLS certificates: %v", err)
+			}
+			tlsConfig.Certificates = []tls.Certificate{cert}
+		}
+
+		return tlsConfig
+	})
 }

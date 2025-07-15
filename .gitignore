@@ -4,6 +4,9 @@
 *.swo
 
 /dist
+CLAUDE.md
+PLAN.md
+.claude
 
 node_modules
 jspm_packages
