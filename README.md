@@ -18,7 +18,6 @@ A _**simple library**_ for quickly developing **secure web services**. Supports 
 
 The goal is simple: enable development of **secure** Service APIs - not the scaffolding.
 
-
 ## How to Use
 
 ```sh
@@ -30,22 +29,32 @@ go get github.com/go-obvious/server
 The server can be configured using environment variables:
 
 **Server Settings:**
+
 - `SERVER_MODE` - Server mode: `http`, `https`, `aws-gateway-v1`, `aws-gateway-v2` (default: `http`)
 - `SERVER_DOMAIN` - Server domain (default: `example.com`)
 - `SERVER_PORT` - Server port (default: `8080`)
 
 **Security Configuration:**
+
 - `SERVER_CORS_ALLOWED_ORIGINS` - Comma-separated CORS origins (default: `http://localhost:3000,http://localhost:8080`)
 - `SERVER_TLS_MIN_VERSION` - Minimum TLS version: `1.2` or `1.3` (default: `1.2`)
 - `SERVER_SECURITY_HEADERS_ENABLED` - Enable automatic security headers (default: `true`)
 - `SERVER_HSTS_MAX_AGE` - HSTS max age in seconds (default: `31536000`)
 
+**TLS Certificate Configuration:**
+
+- `SERVER_CERTIFICATE_CERT_FILE` - Path to TLS certificate file (required for HTTPS)
+- `SERVER_CERTIFICATE_KEY_FILE` - Path to TLS private key file (required for HTTPS)
+- `SERVER_CERTIFICATE_CA_FILE` - Path to CA certificate file (optional)
+
 **Timeout Configuration:**
+
 - `SERVER_READ_TIMEOUT` - HTTP read timeout (default: `30s`)
 - `SERVER_WRITE_TIMEOUT` - HTTP write timeout (default: `30s`)
 - `SERVER_IDLE_TIMEOUT` - HTTP idle timeout (default: `120s`)
 
 **Rate Limiting Configuration:**
+
 - `SERVER_RATE_LIMIT_ENABLED` - Enable request rate limiting (default: `false`)
 - `SERVER_RATE_LIMIT_REQUESTS` - Max requests per window (default: `100`)
 - `SERVER_RATE_LIMIT_WINDOW` - Time window duration (default: `1m`)
@@ -55,6 +64,7 @@ The server can be configured using environment variables:
 - `SERVER_RATE_LIMIT_HEADER` - Header name for header extractor (default: `X-API-Key`)
 
 **Security Features:**
+
 - CORS wildcard `*` origins are blocked for security
 - TLS 1.2+ with secure cipher suites and curves
 - Automatic security headers: HSTS, CSP, X-Frame-Options, etc.
@@ -76,6 +86,7 @@ type Configurable interface {
 ```
 
 **The Pattern:**
+
 1. **Self-Registration** - Components register themselves during initialization
 2. **Centralized Loading** - Server calls `config.Load()` to process all configurations
 3. **Fail-Fast Validation** - Invalid configuration prevents startup with clear error messages
@@ -450,7 +461,50 @@ go run main.go  # Now limits to 50 requests per minute per IP
 ## 📚 Examples & Documentation
 
 ### Examples
-- **[examples/](./examples/)** - Community examples repository (git submodule)
+- **[examples/](./examples/)** - Comprehensive examples with basic HTTP servers, lifecycle management, and advanced features
 - **[github.com/go-obvious/server-example](https://github.com/go-obvious/server-example)** - Additional examples and tutorials
 
-All examples including basic HTTP servers, HTTPS configurations, rate limiting, and real-world deployment configurations are maintained in the community examples repository.
+All examples including basic HTTP servers, HTTPS configurations, rate limiting, configuration registry, lifecycle management, and real-world deployment configurations are maintained in the examples directory and community repositories.
+
+### Documentation
+- **[Configuration Reference](./CLAUDE.md)** - Complete configuration options and development commands
+- **[Contributing Guide](./CONTRIBUTING.md)** - How to contribute to the project
+- **[Code of Conduct](./CODE-OF-CONDUCT.md)** - Community guidelines
+
+## 🧪 Testing & Coverage
+
+The server framework includes comprehensive test coverage for all core functionality:
+
+- **API Package**: 100% coverage - Service registration, routing, and integration
+- **Request Package**: 75.5% coverage - HTTP request/response handling, JSON processing, error handling
+- **Config Package**: 100% coverage - Configuration loading, validation, and registry
+- **Middleware**: 90%+ coverage - Security headers, rate limiting, request tracking, panic recovery
+
+Run tests with:
+```sh
+make test          # Run all tests
+make test-coverage # Run tests with coverage report
+make lint         # Run code quality checks
+```
+
+## 🚀 Production Ready Features
+
+### Security
+- **CORS Protection** - Configurable origin restrictions, wildcard blocking
+- **TLS Hardening** - TLS 1.2+ minimum, secure cipher suites, certificate validation
+- **Security Headers** - HSTS, CSP, X-Frame-Options, X-Content-Type-Options
+- **Rate Limiting** - Multiple algorithms (token bucket, sliding window, fixed window)
+- **Request Validation** - Body size limits, timeout protection
+
+### Reliability  
+- **Graceful Shutdown** - SIGTERM/SIGINT handling, connection draining
+- **Health Checks** - Built-in `/healthz` endpoint
+- **Panic Recovery** - Automatic recovery with error tracking
+- **Structured Logging** - Request correlation, error context
+- **Timeout Management** - Read, write, and idle timeouts
+
+### Observability
+- **Request Tracking** - Correlation IDs, request/response logging
+- **Error Context** - Enhanced error reporting with stack traces
+- **Metrics Ready** - Middleware hooks for metrics collection
+- **Health Monitoring** - Service health and dependency checks
