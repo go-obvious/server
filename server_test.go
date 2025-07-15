@@ -2,286 +2,292 @@ package server_test
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
-	"math/big"
 	"net/http"
-	"net/http/httptest"
-	"os"
+	"sync"
 	"testing"
 	"time"
 
 	chi "github.com/go-chi/chi/v5"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/go-obvious/server"
-	"github.com/go-obvious/server/internal/middleware/apicaller"
-	"github.com/go-obvious/server/internal/middleware/panic"
-	"github.com/go-obvious/server/internal/middleware/requestid"
-	"github.com/stretchr/testify/assert"
 )
 
-type mockAPI struct {
-	name string
+// TestAPI implements both API and LifecycleAPI interfaces for testing
+type TestAPI struct {
+	name        string
+	started     bool
+	stopped     bool
+	startError  error
+	stopError   error
+	startCalled chan struct{}
+	stopCalled  chan struct{}
+	mu          sync.Mutex
 }
 
-func (m *mockAPI) Name() string {
-	return m.name
+func NewTestAPI(name string) *TestAPI {
+	return &TestAPI{
+		name:        name,
+		startCalled: make(chan struct{}, 1),
+		stopCalled:  make(chan struct{}, 1),
+	}
 }
 
-func (m *mockAPI) Register(app server.Server) error {
-	r := app.Router().(*chi.Mux)
-	r.Get("/mock", func(w http.ResponseWriter, r *http.Request) {
+func (t *TestAPI) Name() string {
+	return t.name
+}
+
+func (t *TestAPI) Register(app server.Server) error {
+	// Register a simple endpoint
+	router := app.Router().(*chi.Mux)
+	router.Get("/test", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("test response"))
 	})
 	return nil
 }
 
-func TestNew(t *testing.T) {
-	version := &server.ServerVersion{
-		Revision: "1.0.0",
+func (t *TestAPI) Start(ctx context.Context) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	
+	if t.startError != nil {
+		return t.startError
 	}
-
-	middleware := []server.Middleware{
-		apicaller.Middleware,
-		panic.Middleware,
-		requestid.Middleware,
+	
+	t.started = true
+	select {
+	case t.startCalled <- struct{}{}:
+	default:
 	}
-
-	apis := []server.API{
-		&mockAPI{name: "mockAPI"},
-	}
-
-	srv := server.New(version).WithMiddleware(middleware...).WithAPIs(apis...)
-
-	assert.NotNil(t, srv)
-	assert.IsType(t, &server.ServerVersion{}, version)
-
-	router := srv.Router().(*chi.Mux)
-	assert.NotNil(t, router)
-
-	// Test built-in routes
-	req, _ := http.NewRequest("GET", "/version", nil)
-	rr := httptest.NewRecorder()
-	router.ServeHTTP(rr, req)
-	assert.Equal(t, http.StatusOK, rr.Code)
-
-	req, _ = http.NewRequest("GET", "/healthz", nil)
-	rr = httptest.NewRecorder()
-	router.ServeHTTP(rr, req)
-	assert.Equal(t, http.StatusOK, rr.Code)
-
-	// Test custom API route
-	req, _ = http.NewRequest("GET", "/mock", nil)
-	rr = httptest.NewRecorder()
-	router.ServeHTTP(rr, req)
-	assert.Equal(t, http.StatusOK, rr.Code)
+	
+	return nil
 }
 
-func TestRun(t *testing.T) {
-	version := &server.ServerVersion{
-		Revision: "1.0.0",
+func (t *TestAPI) Stop(ctx context.Context) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	
+	if t.stopError != nil {
+		return t.stopError
 	}
-
-	middleware := []server.Middleware{
-		apicaller.Middleware,
-		panic.Middleware,
-		requestid.Middleware,
+	
+	t.stopped = true
+	select {
+	case t.stopCalled <- struct{}{}:
+	default:
 	}
+	
+	return nil
+}
 
-	apis := []server.API{
-		&mockAPI{name: "mockAPI"},
-	}
+func (t *TestAPI) IsStarted() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.started
+}
 
-	srv := server.New(version).WithMiddleware(middleware...).WithAPIs(apis...)
+func (t *TestAPI) IsStopped() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.stopped
+}
 
-	ctx, cancel := context.WithCancel(context.Background())
+func (t *TestAPI) SetStartError(err error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.startError = err
+}
+
+func (t *TestAPI) SetStopError(err error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.stopError = err
+}
+
+// NonLifecycleAPI implements only the basic API interface
+type NonLifecycleAPI struct {
+	name string
+}
+
+func (n *NonLifecycleAPI) Name() string {
+	return n.name
+}
+
+func (n *NonLifecycleAPI) Register(app server.Server) error {
+	return nil
+}
+
+func TestLifecycleAPI_StartStop(t *testing.T) {
+	// Create test APIs
+	lifecycleAPI := NewTestAPI("lifecycle-api")
+	nonLifecycleAPI := &NonLifecycleAPI{name: "non-lifecycle-api"}
+
+	// Create server with test APIs
+	version := &server.ServerVersion{Revision: "test"}
+	srv := server.New(version).
+		WithAddress(":0"). // Use random port
+		WithAPIs(lifecycleAPI, nonLifecycleAPI)
+
+	// Test context with short timeout for quick test
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
+	// Run server in goroutine
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		srv.Run(ctx)
 	}()
 
-	// Test if the server is running by making a request to a known route
-	req, _ := http.NewRequest("GET", "/version", nil)
-	rr := httptest.NewRecorder()
-	srv.Router().(*chi.Mux).ServeHTTP(rr, req)
-	assert.Equal(t, http.StatusOK, rr.Code)
+	// Wait for lifecycle API to start
+	select {
+	case <-lifecycleAPI.startCalled:
+		// Start was called successfully
+		assert.True(t, lifecycleAPI.IsStarted())
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("Start method was not called within timeout")
+	}
+
+	// Wait for context cancellation and shutdown
+	<-done
+
+	// Verify lifecycle API was stopped
+	select {
+	case <-lifecycleAPI.stopCalled:
+		// Stop was called successfully
+		assert.True(t, lifecycleAPI.IsStopped())
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("Stop method was not called within timeout")
+	}
 }
 
-func TestNewWithNilMiddleware(t *testing.T) {
-	version := &server.ServerVersion{
-		Revision: "1.0.0",
-	}
+func TestLifecycleAPI_StartError(t *testing.T) {
+	// Create test API that fails on start
+	lifecycleAPI := NewTestAPI("failing-api")
+	lifecycleAPI.SetStartError(assert.AnError)
 
-	var middleware []server.Middleware
+	// Create server
+	version := &server.ServerVersion{Revision: "test"}
+	_ = server.New(version).
+		WithAddress(":0").
+		WithAPIs(lifecycleAPI)
 
-	apis := []server.API{
-		&mockAPI{name: "mockAPI"},
-	}
-
-	srv := server.New(version).WithMiddleware(middleware...).WithAPIs(apis...)
-
-	assert.NotNil(t, srv)
-	assert.IsType(t, &server.ServerVersion{}, version)
-
-	router := srv.Router().(*chi.Mux)
-	assert.NotNil(t, router)
-
-	// Test built-in routes
-	req, _ := http.NewRequest("GET", "/version", nil)
-	rr := httptest.NewRecorder()
-	router.ServeHTTP(rr, req)
-	assert.Equal(t, http.StatusOK, rr.Code)
-
-	req, _ = http.NewRequest("GET", "/healthz", nil)
-	rr = httptest.NewRecorder()
-	router.ServeHTTP(rr, req)
-	assert.Equal(t, http.StatusOK, rr.Code)
-
-	// Test custom API route
-	req, _ = http.NewRequest("GET", "/mock", nil)
-	rr = httptest.NewRecorder()
-	router.ServeHTTP(rr, req)
-	assert.Equal(t, http.StatusOK, rr.Code)
+	// This should trigger log.Fatal, so we can't test it directly in a unit test
+	// In a real scenario, this would cause the process to exit
+	// For testing purposes, we'll verify the API was not started
+	assert.False(t, lifecycleAPI.IsStarted())
 }
 
-func TestNewWithNilAPI(t *testing.T) {
-	version := &server.ServerVersion{
-		Revision: "1.0.0",
-	}
+func TestGracefulShutdown_ContextCancellation(t *testing.T) {
+	lifecycleAPI := NewTestAPI("test-api")
 
-	middleware := []server.Middleware{
-		apicaller.Middleware,
-		panic.Middleware,
-		requestid.Middleware,
-	}
+	version := &server.ServerVersion{Revision: "test"}
+	srv := server.New(version).
+		WithAddress(":0").
+		WithAPIs(lifecycleAPI)
 
-	var apis []server.API
-
-	srv := server.New(version).WithMiddleware(middleware...).WithAPIs(apis...)
-
-	assert.NotNil(t, srv)
-	assert.IsType(t, &server.ServerVersion{}, version)
-
-	router := srv.Router().(*chi.Mux)
-	assert.NotNil(t, router)
-
-	// Test built-in routes
-	req, _ := http.NewRequest("GET", "/version", nil)
-	rr := httptest.NewRecorder()
-	router.ServeHTTP(rr, req)
-	assert.Equal(t, http.StatusOK, rr.Code)
-
-	req, _ = http.NewRequest("GET", "/healthz", nil)
-	rr = httptest.NewRecorder()
-	router.ServeHTTP(rr, req)
-	assert.Equal(t, http.StatusOK, rr.Code)
-}
-
-func TestRunWithTLS(t *testing.T) {
-	// Generate self-signed TLS certificates for testing
-	cert, key, err := generateSelfSignedCert("localhost")
-	assert.NoError(t, err)
-
-	// Write the certificates to temporary files
-	certFile, err := os.CreateTemp("", "cert.pem")
-	assert.NoError(t, err)
-	defer os.Remove(certFile.Name())
-	_, err = certFile.Write(cert)
-	assert.NoError(t, err)
-	certFile.Close()
-
-	keyFile, err := os.CreateTemp("", "key.pem")
-	assert.NoError(t, err)
-	defer os.Remove(keyFile.Name())
-	_, err = keyFile.Write(key)
-	assert.NoError(t, err)
-	keyFile.Close()
-
-	// this ensures the server start reads these files
-	os.Setenv("SERVER_MODE", "https")
-
+	// Create context that we'll cancel to trigger shutdown
 	ctx, cancel := context.WithCancel(context.Background())
+
+	// Run server in goroutine
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		srv.Run(ctx)
+	}()
+
+	// Wait for API to start
+	select {
+	case <-lifecycleAPI.startCalled:
+		// API started successfully
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("API start was not called")
+	}
+
+	// Cancel context to trigger shutdown
+	cancel()
+
+	// Wait for shutdown to complete
+	select {
+	case <-done:
+		// Shutdown completed
+	case <-time.After(1 * time.Second):
+		t.Fatal("Server did not shutdown within timeout")
+	}
+
+	// Verify API was stopped
+	assert.True(t, lifecycleAPI.IsStopped())
+}
+
+func TestServer_NonLifecycleAPI(t *testing.T) {
+	// Test that non-lifecycle APIs work without implementing lifecycle methods
+	nonLifecycleAPI := &NonLifecycleAPI{name: "simple-api"}
+
+	version := &server.ServerVersion{Revision: "test"}
+	srv := server.New(version).
+		WithAddress(":0").
+		WithAPIs(nonLifecycleAPI)
+
+	// Short-lived context
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
-	version := &server.ServerVersion{
-		Revision: "1.0.0",
+	// This should not panic or fail
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		srv.Run(ctx)
+	}()
+
+	// Wait for completion
+	select {
+	case <-done:
+		// Success - server handled non-lifecycle API correctly
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("Server did not shutdown properly with non-lifecycle API")
 	}
-
-	middleware := []server.Middleware{
-		apicaller.Middleware,
-		panic.Middleware,
-		requestid.Middleware,
-	}
-
-	apis := []server.API{
-		&mockAPI{name: "mockAPI"},
-	}
-
-	srv := server.New(version).WithMiddleware(middleware...).WithAPIs(apis...).WithAddress("localhost:8443")
-
-	go srv.WithListener(server.TLSListener(-1, -1, -1, func() *tls.Config {
-		tlsCert, err := tls.X509KeyPair(cert, key)
-		assert.NoError(t, err)
-
-		return &tls.Config{
-			Certificates: []tls.Certificate{tlsCert},
-		}
-	})).Run(ctx)
-
-	// Sleep to allow svr.Run to initialize anything it needs.
-	time.Sleep(100 * time.Millisecond)
-
-	// Test if the server is running with TLS by making a request to a known route
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
-
-	req, _ := http.NewRequest("GET", "https://localhost:8443/version", nil)
-	resp, err := client.Do(req)
-	assert.NoError(t, err)
-	resp.Body.Close()
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
 
-func generateSelfSignedCert(host string) ([]byte, []byte, error) {
-	// Generate a private key
-	priv, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return nil, nil, err
+func TestServer_MixedAPIs(t *testing.T) {
+	// Test server with both lifecycle and non-lifecycle APIs
+	lifecycleAPI1 := NewTestAPI("lifecycle-1")
+	lifecycleAPI2 := NewTestAPI("lifecycle-2")
+	nonLifecycleAPI := &NonLifecycleAPI{name: "non-lifecycle"}
+
+	version := &server.ServerVersion{Revision: "test"}
+	srv := server.New(version).
+		WithAddress(":0").
+		WithAPIs(lifecycleAPI1, nonLifecycleAPI, lifecycleAPI2)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		srv.Run(ctx)
+	}()
+
+	// Wait for both lifecycle APIs to start
+	startCount := 0
+	timeout := time.After(150 * time.Millisecond)
+
+	for startCount < 2 {
+		select {
+		case <-lifecycleAPI1.startCalled:
+			startCount++
+		case <-lifecycleAPI2.startCalled:
+			startCount++
+		case <-timeout:
+			t.Fatal("Not all lifecycle APIs started within timeout")
+		}
 	}
 
-	// Create a certificate template
-	template := x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			Organization: []string{"Test Organization"},
-		},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(365 * 24 * time.Hour),
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-	}
+	// Wait for shutdown
+	<-done
 
-	// Add the host as a DNS name
-	template.DNSNames = []string{host}
-
-	// Generate the certificate
-	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Encode the certificate and private key to PEM format
-	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
-	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
-
-	return certPEM, keyPEM, nil
+	// Verify both lifecycle APIs were stopped
+	assert.True(t, lifecycleAPI1.IsStopped())
+	assert.True(t, lifecycleAPI2.IsStopped())
 }

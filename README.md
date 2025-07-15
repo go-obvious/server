@@ -176,6 +176,221 @@ export MY_SERVICE_DEBUG=true
 
 The configuration registry eliminates configuration chaos by providing a standard pattern that scales from simple services to complex microservice architectures.
 
+## 🔄 API Lifecycle Management
+
+The server provides optional lifecycle hooks for APIs that need startup initialization or graceful shutdown cleanup. This enables proper resource management in production environments.
+
+### How It Works
+
+APIs can implement the optional `LifecycleAPI` interface to receive lifecycle notifications:
+
+```go
+type LifecycleAPI interface {
+    API
+    // Start is called after registration but before the server accepts requests
+    Start(ctx context.Context) error
+    // Stop is called during graceful shutdown with a timeout context
+    Stop(ctx context.Context) error
+}
+```
+
+**Lifecycle Flow:**
+1. **Registration** - APIs register routes with `Register()`
+2. **Startup** - `Start()` called for lifecycle-aware APIs  
+3. **Runtime** - Server handles requests normally
+4. **Shutdown Signal** - SIGTERM/SIGINT or context cancellation
+5. **Graceful Shutdown** - Server stops accepting new requests
+6. **API Cleanup** - `Stop()` called for resource cleanup
+7. **Connection Draining** - Existing requests complete with timeout
+
+### Database Service Example
+
+```go
+package database
+
+import (
+    "context"
+    "database/sql"
+    "time"
+    
+    "github.com/go-obvious/server"
+)
+
+type DatabaseService struct {
+    db     *sql.DB
+    config *Config
+}
+
+func NewDatabaseService() *DatabaseService {
+    return &DatabaseService{
+        config: &Config{}, // Your database config
+    }
+}
+
+// Implement the required API interface
+func (d *DatabaseService) Name() string { return "database" }
+
+func (d *DatabaseService) Register(app server.Server) error {
+    router := app.Router().(*chi.Mux)
+    router.Get("/users", d.getUsers)
+    router.Post("/users", d.createUser)
+    return nil
+}
+
+// Implement optional lifecycle hooks
+func (d *DatabaseService) Start(ctx context.Context) error {
+    log.Info().Msg("Connecting to database")
+    
+    db, err := sql.Open("postgres", d.config.DatabaseURL)
+    if err != nil {
+        return fmt.Errorf("failed to connect to database: %w", err)
+    }
+    
+    // Test connection
+    if err := db.PingContext(ctx); err != nil {
+        return fmt.Errorf("database ping failed: %w", err)
+    }
+    
+    d.db = db
+    log.Info().Msg("Database connection established")
+    return nil
+}
+
+func (d *DatabaseService) Stop(ctx context.Context) error {
+    log.Info().Msg("Closing database connections")
+    
+    if d.db != nil {
+        // Wait for active queries to complete or timeout
+        if err := d.db.Close(); err != nil {
+            log.Error().Err(err).Msg("Error closing database")
+            return err
+        }
+    }
+    
+    log.Info().Msg("Database connections closed")
+    return nil
+}
+
+// Your API handlers...
+func (d *DatabaseService) getUsers(w http.ResponseWriter, r *http.Request) {
+    // Use d.db for queries - guaranteed to be connected
+}
+```
+
+### Background Worker Example
+
+```go
+package worker
+
+import (
+    "context"
+    "sync"
+    "time"
+)
+
+type BackgroundWorker struct {
+    stopCh chan struct{}
+    wg     sync.WaitGroup
+}
+
+func NewBackgroundWorker() *BackgroundWorker {
+    return &BackgroundWorker{
+        stopCh: make(chan struct{}),
+    }
+}
+
+func (w *BackgroundWorker) Name() string { return "background-worker" }
+
+func (w *BackgroundWorker) Register(app server.Server) error {
+    // Optional: register health check endpoint
+    return nil
+}
+
+func (w *BackgroundWorker) Start(ctx context.Context) error {
+    log.Info().Msg("Starting background worker")
+    
+    w.wg.Add(1)
+    go func() {
+        defer w.wg.Done()
+        ticker := time.NewTicker(30 * time.Second)
+        defer ticker.Stop()
+        
+        for {
+            select {
+            case <-ticker.C:
+                w.doWork()
+            case <-w.stopCh:
+                log.Info().Msg("Background worker stopping")
+                return
+            }
+        }
+    }()
+    
+    return nil
+}
+
+func (w *BackgroundWorker) Stop(ctx context.Context) error {
+    log.Info().Msg("Shutting down background worker")
+    
+    close(w.stopCh)
+    
+    // Wait for worker to finish with context timeout
+    done := make(chan struct{})
+    go func() {
+        w.wg.Wait()
+        close(done)
+    }()
+    
+    select {
+    case <-done:
+        log.Info().Msg("Background worker stopped gracefully")
+    case <-ctx.Done():
+        log.Warn().Msg("Background worker shutdown timed out")
+    }
+    
+    return nil
+}
+```
+
+### Using Lifecycle APIs
+
+```go
+func main() {
+    // Services with lifecycle management
+    dbService := database.NewDatabaseService()
+    worker := worker.NewBackgroundWorker()
+    
+    // Regular API without lifecycle hooks
+    apiService := &MyAPI{}
+    
+    version := &server.ServerVersion{Revision: "v1.0.0"}
+    srv := server.New(version).WithAPIs(dbService, worker, apiService)
+    
+    // Graceful shutdown with SIGTERM/SIGINT handling
+    srv.Run(context.Background())
+    
+    // Lifecycle flow:
+    // 1. dbService.Start() - connects to database
+    // 2. worker.Start() - starts background processes  
+    // 3. Server accepts requests
+    // 4. On SIGTERM: stops accepting requests
+    // 5. worker.Stop() - stops background processes
+    // 6. dbService.Stop() - closes database connections
+    // 7. Existing requests complete (up to 30s timeout)
+}
+```
+
+### Lifecycle Benefits
+
+**🔄 Resource Management** - Proper startup and cleanup of external resources  
+**⚡ Fail-Fast** - Startup errors prevent server from accepting requests  
+**🛡️ Graceful Shutdown** - Clean resource cleanup on SIGTERM/SIGINT  
+**⏱️ Timeout Protection** - Configurable shutdown timeout prevents hanging  
+**🔍 Observable** - Structured logging for lifecycle events  
+**🧩 Optional** - Existing APIs work unchanged, opt-in for advanced features
+
+The lifecycle management ensures production-ready resource handling while maintaining the simplicity of the basic API interface.
+
 ## 🚀 Quick Start
 
 ### Basic HTTP Server
