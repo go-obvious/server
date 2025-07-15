@@ -354,6 +354,141 @@ func TestServerConfig_RateLimit_Configuration(t *testing.T) {
 	}
 }
 
+func TestServerConfig_Load_EnvconfigError(t *testing.T) {
+	config.Reset()
+	
+	// Test envconfig.Process() error handling (currently missing coverage)
+	// This tests the error path in Server.Load() at lines 44-46
+	
+	// Set an invalid duration format that will cause envconfig.Process to fail
+	os.Setenv("SERVER_READ_TIMEOUT", "invalid-duration-format")
+	defer os.Unsetenv("SERVER_READ_TIMEOUT")
+	
+	cfg := &config.Server{}
+	config.Register(cfg)
+	
+	err := config.Load()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "time: invalid duration")
+}
+
+func TestServerConfig_HTTPS_CertificateValidation(t *testing.T) {
+	// Test HTTPS certificate file validation (currently missing coverage)
+	// This tests the certificate validation paths in validateTLS() at lines 135-146
+	
+	tests := []struct {
+		name        string
+		setupFiles  func() (certFile, keyFile string, cleanup func())
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "HTTPS mode with valid certificate files",
+			setupFiles: func() (string, string, func()) {
+				// Create temporary certificate files
+				certFile := "/tmp/test_cert.pem"
+				keyFile := "/tmp/test_key.pem"
+				
+				// Create empty files (content doesn't matter for validation)
+				os.WriteFile(certFile, []byte("cert content"), 0644)
+				os.WriteFile(keyFile, []byte("key content"), 0644)
+				
+				cleanup := func() {
+					os.Remove(certFile)
+					os.Remove(keyFile)
+				}
+				
+				return certFile, keyFile, cleanup
+			},
+			expectError: false,
+		},
+		{
+			name: "HTTPS mode with missing certificate file",
+			setupFiles: func() (string, string, func()) {
+				certFile := "/tmp/nonexistent_cert.pem"
+				keyFile := "/tmp/test_key.pem"
+				
+				// Create only key file
+				os.WriteFile(keyFile, []byte("key content"), 0644)
+				
+				cleanup := func() {
+					os.Remove(keyFile)
+				}
+				
+				return certFile, keyFile, cleanup
+			},
+			expectError: true,
+			errorMsg:    "TLS certificate file does not exist",
+		},
+		{
+			name: "HTTPS mode with missing key file",
+			setupFiles: func() (string, string, func()) {
+				certFile := "/tmp/test_cert.pem"
+				keyFile := "/tmp/nonexistent_key.pem"
+				
+				// Create only cert file
+				os.WriteFile(certFile, []byte("cert content"), 0644)
+				
+				cleanup := func() {
+					os.Remove(certFile)
+				}
+				
+				return certFile, keyFile, cleanup
+			},
+			expectError: true,
+			errorMsg:    "TLS key file does not exist",
+		},
+		{
+			name: "HTTP mode - no certificate validation",
+			setupFiles: func() (string, string, func()) {
+				// Use non-existent files but HTTP mode should skip validation
+				return "/tmp/nonexistent_cert.pem", "/tmp/nonexistent_key.pem", func() {}
+			},
+			expectError: false,
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config.Reset()
+			
+			certFile, keyFile, cleanup := tt.setupFiles()
+			defer cleanup()
+			
+			// Set environment variables for HTTPS mode with certificate
+			if tt.name == "HTTP mode - no certificate validation" {
+				os.Setenv("SERVER_MODE", "http")
+			} else {
+				os.Setenv("SERVER_MODE", "https")
+			}
+			defer os.Unsetenv("SERVER_MODE")
+			
+			os.Setenv("SERVER_CERTIFICATE_CERT_FILE", certFile)
+			defer os.Unsetenv("SERVER_CERTIFICATE_CERT_FILE")
+			
+			os.Setenv("SERVER_CERTIFICATE_KEY_FILE", keyFile)
+			defer os.Unsetenv("SERVER_CERTIFICATE_KEY_FILE")
+			
+			// Set TLS version to pass other validations
+			os.Setenv("SERVER_TLS_MIN_VERSION", "1.2")
+			defer os.Unsetenv("SERVER_TLS_MIN_VERSION")
+			
+			// Create fresh config and register it
+			cfg := &config.Server{}
+			config.Register(cfg)
+			
+			err := config.Load()
+			
+			if tt.expectError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMsg)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestServerConfig_RateLimit_Validation(t *testing.T) {
 	tests := []struct {
 		name        string

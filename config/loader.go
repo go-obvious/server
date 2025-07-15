@@ -21,9 +21,19 @@ func Register(cfgs ...Configurable) {
 
 func Load() error {
 	for _, cfg := range configurations {
+		if cfg == nil {
+			continue // Skip nil configurations
+		}
 		if err := cfg.Load(); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// Reset clears all registered configurations. This is primarily for testing.
+func Reset() {
+	mu.Lock()
+	defer mu.Unlock()
+	configurations = make([]Configurable, 0)
 }
