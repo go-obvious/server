@@ -9,7 +9,7 @@ require (
 	github.com/go-obvious/gateway v0.1.1
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/rs/zerolog v1.34.0
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.0
 )
 
 require (
